@@ -23,6 +23,43 @@ impl<T: Copy> Volatile<T> {
     }
 }
 
+#[derive(Debug)]
+pub struct ReadOnly<T: Copy>(Volatile<T>);
+
+impl<T: Copy> ReadOnly<T> {
+    pub fn read(&self) -> T {
+        self.0.read()
+    }
+}
+
+#[derive(Debug)]
+pub struct WriteOnly<T: Copy>(Volatile<T>);
+
+impl<T: Copy> WriteOnly<T> {
+    pub fn write(&mut self, value: T) {
+        self.0.write(value)
+    }
+}
+
+#[derive(Debug)]
+pub struct ReadWrite<T: Copy>(Volatile<T>);
+
+impl<T: Copy> ReadWrite<T> {
+    pub fn read(&self) -> T {
+        self.0.read()
+    }
+
+    pub fn write(&mut self, value: T) {
+        self.0.write(value)
+    }
+
+    pub fn update<F>(&mut self, f: F)
+        where F: FnOnce(&mut T)
+    {
+        self.0.update(f)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Volatile;
