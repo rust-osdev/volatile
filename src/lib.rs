@@ -1,4 +1,4 @@
-//! Provides wrapper types [`Volatile`, `ReadOnly`, `WriteOnly`, `ReadWrite`], which wrap any copy-able type and allows for
+//! Provides wrapper types `Volatile`, `ReadOnly`, `WriteOnly`, `ReadWrite`, which wrap any copy-able type and allows for
 //! volatile memory access to wrapped value. Volatile memory accesses are never optimized away by
 //! the compiler, and are useful in many low-level systems programming and concurrent contexts.
 //!
@@ -28,7 +28,7 @@
 use core::ptr;
 
 /// A wrapper type around a volatile variable, which allows for volatile reads and writes
-/// to the contained value. The stored type needs to be [`Copy`], as volatile reads and writes
+/// to the contained value. The stored type needs to be `Copy`, as volatile reads and writes
 /// take and return copies of the value.
 ///
 /// The size of this struct is the same as the size of the contained type.
@@ -144,7 +144,7 @@ impl<T: Copy> ReadOnly<T> {
     }
 
     /// Perform a volatile read of the contained value, returning a copy of the read value.
-    /// Functionally equivalent to [`Volatile::read`].
+    /// Functionally equivalent to `Volatile::read`.
     ///
     /// ```rust
     /// use volatile::ReadOnly;
@@ -184,7 +184,7 @@ impl<T: Copy> WriteOnly<T> {
     }
 
     /// Performs a volatile write of value `value` into the contained value. Functionally identical
-    /// to [`Volatile::write`].
+    /// to `Volatile::write`.
     ///
     /// ```rust
     /// use volatile::WriteOnly;
@@ -203,7 +203,7 @@ impl<T: Copy> WriteOnly<T> {
 }
 
 /// A volatile wrapper which allows both read and write operations;
-/// functionally equivalent to the [`Volatile`] type.
+/// functionally equivalent to the `Volatile` type.
 ///
 /// The size of this struct is the same as the contained type.
 #[derive(Debug)]
@@ -226,7 +226,7 @@ impl<T: Copy> ReadWrite<T> {
     }
 
     /// Perform a volatile read of the contained value and return a copy of the read value.
-    /// Functionally identical to [`Volatile::read`].
+    /// Functionally identical to `Volatile::read`.
     ///
     /// # Panics
     ///
@@ -236,7 +236,7 @@ impl<T: Copy> ReadWrite<T> {
     }
 
     /// Peform a volatile write of value `value` into the contained value. Functionally identical
-    /// to [`Volatile::write`].
+    /// to `Volatile::write`.
     ///
     /// # Panics
     ///
@@ -247,7 +247,7 @@ impl<T: Copy> ReadWrite<T> {
 
     /// Perform a volatile read of the contained value, pass a mutable reference to it to function
     /// `f`, and then perform a volatile write back of the (potentially updated) value to the contained
-    /// value. Functionally identical to [`Volatile::update`].
+    /// value. Functionally identical to `Volatile::update`.
     ///
     /// # Panics
     ///
