@@ -54,7 +54,7 @@ impl<T: Copy> Volatile<T> {
     /// Performs a volatile read of the contained value, returning a copy
     /// of the read value. Volatile reads are guaranteed not to be optimized
     /// away by the compiler, but by themselves do not have atomic ordering
-    /// guaruntees. To also get atomicity, consider looking at the `Atomic` wrapper type.
+    /// guarantees. To also get atomicity, consider looking at the `Atomic` wrapper type.
     ///
     /// ```rust
     /// use volatile::Volatile;
