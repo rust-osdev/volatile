@@ -203,61 +203,11 @@ impl<T: Copy> WriteOnly<T> {
 }
 
 /// A volatile wrapper which allows both read and write operations;
-/// functionally equivalent to the `Volatile` type.
+/// functionally equivalent to the `Volatile` type, as it is a type
+/// alias for it.
 ///
 /// The size of this struct is the same as the contained type.
-#[derive(Debug)]
-pub struct ReadWrite<T: Copy>(Volatile<T>);
-
-impl<T: Copy> ReadWrite<T> {
-    /// Construct a new read-write volatile wrapper containing the given value.
-    ///
-    /// ```rust
-    /// use volatile::ReadWrite;
-    ///
-    /// let value = ReadWrite::new(0u32);
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// This function never panics.
-    pub fn new(value: T) -> ReadWrite<T> {
-        ReadWrite(Volatile(value))
-    }
-
-    /// Perform a volatile read of the contained value and return a copy of the read value.
-    /// Functionally identical to `Volatile::read`.
-    ///
-    /// # Panics
-    ///
-    /// This function never panics.
-    pub fn read(&self) -> T {
-        self.0.read()
-    }
-
-    /// Peform a volatile write of value `value` into the contained value. Functionally identical
-    /// to `Volatile::write`.
-    ///
-    /// # Panics
-    ///
-    /// This function never panics.
-    pub fn write(&mut self, value: T) {
-        self.0.write(value)
-    }
-
-    /// Perform a volatile read of the contained value, pass a mutable reference to it to function
-    /// `f`, and then perform a volatile write back of the (potentially updated) value to the contained
-    /// value. Functionally identical to `Volatile::update`.
-    ///
-    /// # Panics
-    ///
-    /// This function never panics.
-    pub fn update<F>(&mut self, f: F)
-        where F: FnOnce(&mut T)
-    {
-        self.0.update(f)
-    }
-}
+pub type ReadWrite<T> = Volatile<T>;
 
 #[cfg(test)]
 mod tests {
