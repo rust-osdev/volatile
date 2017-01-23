@@ -9,3 +9,6 @@ documentation = "https://docs.rs/volatile"
 repository = "https://github.com/phil-opp/volatile"
 
 [dependencies]
+
+[features]
+const_fn = []
