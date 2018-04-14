@@ -34,7 +34,7 @@ use core::ptr;
 /// take and return copies of the value.
 ///
 /// The size of this struct is the same as the size of the contained type.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Volatile<T: Copy>(T);
 
 impl<T: Copy> Volatile<T> {
@@ -143,7 +143,7 @@ impl<T: Copy> Volatile<T> {
 /// A volatile wrapper which only allows read operations.
 ///
 /// The size of this struct is the same as the contained type.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ReadOnly<T: Copy>(Volatile<T>);
 
 impl<T: Copy> ReadOnly<T> {
@@ -200,7 +200,7 @@ impl<T: Copy> ReadOnly<T> {
 /// A volatile wrapper which only allows write operations.
 ///
 /// The size of this struct is the same as the contained type.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WriteOnly<T: Copy>(Volatile<T>);
 
 impl<T: Copy> WriteOnly<T> {
