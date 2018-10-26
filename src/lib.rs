@@ -34,7 +34,7 @@ use core::ptr;
 /// take and return copies of the value.
 ///
 /// The size of this struct is the same as the size of the contained type.
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Volatile<T: Copy>(T);
 
 impl<T: Copy> Volatile<T> {
