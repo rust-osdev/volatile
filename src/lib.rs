@@ -34,7 +34,7 @@ use core::ptr;
 /// take and return copies of the value.
 ///
 /// The size of this struct is the same as the size of the contained type.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Volatile<T: Copy>(T);
 
 impl<T: Copy> Volatile<T> {
@@ -137,6 +137,12 @@ impl<T: Copy> Volatile<T> {
         let mut value = self.read();
         f(&mut value);
         self.write(value);
+    }
+}
+
+impl<T: Copy> Clone for Volatile<T> {
+    fn clone(&self) -> Self {
+        Volatile(self.read())
     }
 }
 
