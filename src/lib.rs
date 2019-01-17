@@ -35,6 +35,7 @@ use core::ptr;
 ///
 /// The size of this struct is the same as the size of the contained type.
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct Volatile<T: Copy>(T);
 
 impl<T: Copy> Volatile<T> {
