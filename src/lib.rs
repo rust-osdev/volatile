@@ -27,22 +27,22 @@
 //! of the volatile wrapper types are the same size as their contained values.
 #![no_std]
 
-use access::{ReadWrite, Readable, Writable};
-use core::{marker::PhantomData, ptr};
+pub use crate::access::{ReadWrite, Readable, Writable};
+use core::{
+    marker::PhantomData,
+    ops::{Index, IndexMut},
+    ptr,
+    slice::SliceIndex,
+};
 
-pub mod access;
-pub mod foo;
-pub mod reference;
-pub mod reference_mut;
-#[cfg(test)]
-mod tests;
+mod access;
 
 /// A wrapper type around a volatile variable, which allows for volatile reads and writes
 /// to the contained value. The stored type needs to be `Copy`, as volatile reads and writes
 /// take and return copies of the value.
 ///
 /// The size of this struct is the same as the size of the contained type.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 #[repr(transparent)]
 pub struct Volatile<T, A = ReadWrite> {
     value: T,
@@ -69,7 +69,7 @@ impl<T> Volatile<T> {
     }
 }
 
-impl<T: Copy, A: Readable> Volatile<T, A> {
+impl<T: Copy, A> Volatile<&T, A> {
     /// Performs a volatile read of the contained value, returning a copy
     /// of the read value. Volatile reads are guaranteed not to be optimized
     /// away by the compiler, but by themselves do not have atomic ordering
@@ -86,13 +86,40 @@ impl<T: Copy, A: Readable> Volatile<T, A> {
     /// # Panics
     ///
     /// This method never panics.
-    pub fn read(&self) -> T {
+    pub fn read(&self) -> T
+    where
+        A: Readable,
+    {
         // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { ptr::read_volatile(&self.value) }
+        unsafe { ptr::read_volatile(self.value) }
     }
 }
 
-impl<T: Copy, A: Writable> Volatile<T, A> {
+impl<T: Copy, A> Volatile<&mut T, A> {
+    /// Performs a volatile read of the contained value, returning a copy
+    /// of the read value. Volatile reads are guaranteed not to be optimized
+    /// away by the compiler, but by themselves do not have atomic ordering
+    /// guarantees. To also get atomicity, consider looking at the `Atomic` wrapper type.
+    ///
+    /// ```rust
+    /// use volatile::Volatile;
+    ///
+    /// let value = Volatile::new(42u32);
+    ///
+    /// assert_eq!(value.read(), 42u32);
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This method never panics.
+    pub fn read(&self) -> T
+    where
+        A: Readable,
+    {
+        // UNSAFE: Safe, as we know that our internal value exists.
+        unsafe { ptr::read_volatile(self.value) }
+    }
+
     /// Performs a volatile write, setting the contained value to the given value `value`. Volatile
     /// writes are guaranteed to not be optimized away by the compiler, but by themselves do not
     /// have atomic ordering guarantees. To also get atomicity, consider looking at the `Atomic`
@@ -111,13 +138,14 @@ impl<T: Copy, A: Writable> Volatile<T, A> {
     /// # Panics
     ///
     /// This method never panics.
-    pub fn write(&mut self, value: T) {
+    pub fn write(&mut self, value: T)
+    where
+        A: Writable,
+    {
         // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { ptr::write_volatile(&mut self.value, value) };
+        unsafe { ptr::write_volatile(self.value, value) };
     }
-}
 
-impl<T: Copy, A: Readable + Writable> Volatile<T, A> {
     /// Performs a volatile read of the contained value, passes a mutable reference to it to the
     /// function `f`, and then performs a volatile write of the (potentially updated) value back to
     /// the contained value.
@@ -138,6 +166,7 @@ impl<T: Copy, A: Readable + Writable> Volatile<T, A> {
     pub fn update<F>(&mut self, f: F)
     where
         F: FnOnce(&mut T),
+        A: Readable + Writable,
     {
         let mut value = self.read();
         f(&mut value);
@@ -145,11 +174,71 @@ impl<T: Copy, A: Readable + Writable> Volatile<T, A> {
     }
 }
 
-impl<T: Copy, A: Readable> Clone for Volatile<T, A> {
-    fn clone(&self) -> Self {
+impl<T: Copy, A> Volatile<&[T], A> {
+    pub fn index<I>(&self, index: I) -> Volatile<&I::Output, A>
+    where
+        I: SliceIndex<[T]>,
+    {
         Volatile {
-            value: self.read(),
+            value: self.value.index(index),
             access: self.access,
         }
+    }
+}
+
+impl<T: Copy, A> Volatile<&mut [T], A> {
+    pub fn index<I>(&self, index: I) -> Volatile<&I::Output, A>
+    where
+        I: SliceIndex<[T]>,
+    {
+        Volatile {
+            value: self.value.index(index),
+            access: self.access,
+        }
+    }
+
+    pub fn index_mut<I>(&mut self, index: I) -> Volatile<&mut I::Output, A>
+    where
+        I: SliceIndex<[T]>,
+    {
+        Volatile {
+            value: self.value.index_mut(index),
+            access: self.access,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Volatile;
+
+    #[test]
+    fn test_read() {
+        let val = 42;
+        assert_eq!(Volatile::new(&val).read(), 42);
+    }
+
+    #[test]
+    fn test_write() {
+        let mut val = 50;
+        let mut volatile = Volatile::new(&mut val);
+        volatile.write(50);
+        assert_eq!(val, 50);
+    }
+
+    #[test]
+    fn test_update() {
+        let mut val = 42;
+        let mut volatile = Volatile::new(&mut val);
+        volatile.update(|v| *v += 1);
+        assert_eq!(val, 43);
+    }
+
+    #[test]
+    fn test_slice() {
+        let mut val = [1, 2, 3];
+        let mut volatile = Volatile::new(&mut val[..]);
+        volatile.index_mut(0).update(|v| *v += 1);
+        assert_eq!(val, [2, 2, 3]);
     }
 }
