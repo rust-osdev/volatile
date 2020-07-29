@@ -12,7 +12,8 @@
 use access::{ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
 use core::{
     marker::PhantomData,
-    ops::{Index, IndexMut},
+    ops::Deref,
+    ops::{DerefMut, Index, IndexMut},
     ptr,
     slice::SliceIndex,
 };
@@ -35,6 +36,7 @@ pub struct Volatile<R, A = ReadWrite> {
     access: PhantomData<A>,
 }
 
+/// Construction functions
 impl<R> Volatile<R> {
     /// Construct a new volatile instance wrapping the given reference.
     ///
@@ -70,8 +72,10 @@ impl<R> Volatile<R> {
     }
 }
 
-impl<T, A> Volatile<&T, A>
+/// Methods for references to `Copy` types
+impl<R, T, A> Volatile<R, A>
 where
+    R: Deref<Target = T>,
     T: Copy,
 {
     /// Performs a volatile read of the contained value.
@@ -80,48 +84,25 @@ where
     /// away by the compiler, but by themselves do not have atomic ordering
     /// guarantees. To also get atomicity, consider looking at the `Atomic` wrapper type.
     ///
-    /// ## Example
+    /// ## Examples
     ///
     /// ```rust
     /// use volatile::Volatile;
     ///
     /// let value = 42;
-    /// let volatile = Volatile::new(&value);
+    /// let shared_reference = Volatile::new(&value);
+    /// assert_eq!(shared_reference.read(), 42);
     ///
-    /// assert_eq!(volatile.read(), 42);
+    /// let mut value = 50;
+    /// let mut_reference = Volatile::new(&mut value);
+    /// assert_eq!(mut_reference.read(), 50);
     /// ```
     pub fn read(&self) -> T
     where
         A: Readable,
     {
         // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { ptr::read_volatile(self.reference) }
-    }
-}
-
-impl<T: Copy, A> Volatile<&mut T, A> {
-    /// Performs a volatile read of the contained value.
-    ///
-    /// Returns a copy of the read value. Volatile reads are guaranteed not to be optimized
-    /// away by the compiler, but by themselves do not have atomic ordering
-    /// guarantees. To also get atomicity, consider looking at the `Atomic` wrapper type.
-    ///
-    /// ## Example
-    ///
-    /// ```rust
-    /// use volatile::Volatile;
-    ///
-    /// let mut value = 10;
-    /// let volatile = Volatile::new(&mut value);
-    ///
-    /// assert_eq!(volatile.read(), 10);
-    /// ```
-    pub fn read(&self) -> T
-    where
-        A: Readable,
-    {
-        // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { ptr::read_volatile(self.reference) }
+        unsafe { ptr::read_volatile(&*self.reference) }
     }
 
     /// Performs a volatile write, setting the contained value to the given `value`.
@@ -144,9 +125,10 @@ impl<T: Copy, A> Volatile<&mut T, A> {
     pub fn write(&mut self, value: T)
     where
         A: Writable,
+        R: DerefMut,
     {
         // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { ptr::write_volatile(self.reference, value) };
+        unsafe { ptr::write_volatile(&mut *self.reference, value) };
     }
 
     /// Updates the contained value using the given closure and volatile instructions.
@@ -166,8 +148,9 @@ impl<T: Copy, A> Volatile<&mut T, A> {
     /// ```
     pub fn update<F>(&mut self, f: F)
     where
-        F: FnOnce(&mut T),
         A: Readable + Writable,
+        R: DerefMut,
+        F: FnOnce(&mut T),
     {
         let mut value = self.read();
         f(&mut value);
