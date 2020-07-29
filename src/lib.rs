@@ -1,5 +1,3 @@
-#![cfg_attr(feature = "const_fn", feature(const_fn))]
-
 //! Provides the wrapper type `Volatile`, which wraps a reference to any copy-able type and allows
 //! for volatile memory access to wrapped value. Volatile memory accesses are never optimized away
 //! by the compiler, and are useful in many low-level systems programming and concurrent contexts.

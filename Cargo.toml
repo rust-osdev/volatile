@@ -10,9 +10,6 @@ repository = "https://github.com/phil-opp/volatile"
 
 [dependencies]
 
-[features]
-const_fn = []
-
 [package.metadata.release]
 no-dev-version = true
 pre-release-replacements = [
