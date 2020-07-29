@@ -8,8 +8,11 @@
 //! These wrappers do not depend on the standard library and never panic.
 
 #![no_std]
+#![cfg_attr(feature = "nightly", feature(core_intrinsics))]
 
 use access::{ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
+#[cfg(feature = "nightly")]
+use core::intrinsics;
 use core::{
     marker::PhantomData,
     ops::Deref,
@@ -158,22 +161,15 @@ where
     }
 }
 
-impl<T, A> Volatile<&[T], A> {
-    pub fn index<I>(&self, index: I) -> Volatile<&I::Output, A>
+/// Methods for volatile slices
+impl<T, R, A> Volatile<R, A>
+where
+    R: Deref<Target = [T]>,
+{
+    pub fn index<'a, I>(&'a self, index: I) -> Volatile<&'a I::Output, A>
     where
         I: SliceIndex<[T]>,
-    {
-        Volatile {
-            reference: self.reference.index(index),
-            access: self.access,
-        }
-    }
-}
-
-impl<T, A> Volatile<&mut [T], A> {
-    pub fn index<I>(&self, index: I) -> Volatile<&I::Output, A>
-    where
-        I: SliceIndex<[T]>,
+        T: 'a,
     {
         Volatile {
             reference: self.reference.index(index),
@@ -181,13 +177,83 @@ impl<T, A> Volatile<&mut [T], A> {
         }
     }
 
-    pub fn index_mut<I>(&mut self, index: I) -> Volatile<&mut I::Output, A>
+    pub fn index_mut<'a, I>(&'a mut self, index: I) -> Volatile<&mut I::Output, A>
     where
         I: SliceIndex<[T]>,
+        R: DerefMut,
+        T: 'a,
     {
         Volatile {
             reference: self.reference.index_mut(index),
             access: self.access,
+        }
+    }
+
+    #[cfg(feature = "nightly")]
+    pub fn copy_into_slice(&self, dst: &mut [T])
+    where
+        T: Copy,
+    {
+        assert_eq!(
+            self.reference.len(),
+            dst.len(),
+            "destination and source slices have different lengths"
+        );
+        unsafe {
+            intrinsics::volatile_copy_nonoverlapping_memory(
+                dst.as_mut_ptr(),
+                self.reference.as_ptr(),
+                self.reference.len(),
+            );
+        }
+    }
+
+    /// Copies all elements from `src` into `self`, using a volatile memcpy.
+    ///
+    /// The length of `src` must be the same as `self`.
+    ///
+    /// ## Panics
+    ///
+    /// This function will panic if the two slices have different lengths.
+    ///
+    /// ## Examples
+    ///
+    /// Copying two elements from a slice into another:
+    ///
+    /// ```
+    /// use volatile::Volatile;
+    ///
+    /// let src = [1, 2, 3, 4];
+    /// let mut dst = [0, 0];
+    /// // the `Volatile` type does not work with arrays, so convert `dst` to a slice
+    /// let slice = &mut dst[..];
+    /// let mut volatile = Volatile::new(slice);
+    ///
+    /// // Because the slices have to be the same length,
+    /// // we slice the source slice from four elements
+    /// // to two. It will panic if we don't do this.
+    /// volatile.copy_from_slice(&src[2..]);
+    ///
+    /// assert_eq!(src, [1, 2, 3, 4]);
+    /// assert_eq!(dst, [3, 4]);
+    /// ```
+    #[cfg(feature = "nightly")]
+    pub fn copy_from_slice(&mut self, src: &[T])
+    where
+        T: Copy,
+        R: DerefMut,
+    {
+        assert_eq!(
+            self.reference.len(),
+            src.len(),
+            "destination and source slices have different lengths"
+        );
+        unsafe {
+            intrinsics::volatile_copy_nonoverlapping_memory(
+                self.reference.as_mut_ptr(),
+                src.as_ptr(),
+                self.reference.len(),
+            );
         }
     }
 }

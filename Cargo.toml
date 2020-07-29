@@ -10,6 +10,9 @@ repository = "https://github.com/phil-opp/volatile"
 
 [dependencies]
 
+[features]
+nightly = []
+
 [package.metadata.release]
 no-dev-version = true
 pre-release-replacements = [
