@@ -30,13 +30,13 @@ pub mod access;
 /// TODO: read/write permissions
 #[derive(Debug, Default, Clone)]
 #[repr(transparent)]
-pub struct Volatile<T, A = ReadWrite> {
-    value: T,
+pub struct Volatile<R, A = ReadWrite> {
+    reference: R,
     access: PhantomData<A>,
 }
 
-impl<T> Volatile<T> {
-    /// Construct a new volatile instance wrapping the given value reference.
+impl<R> Volatile<R> {
+    /// Construct a new volatile instance wrapping the given reference.
     ///
     /// ## Example
     ///
@@ -48,15 +48,32 @@ impl<T> Volatile<T> {
     /// let volatile = Volatile::new(&value);
     /// assert_eq!(volatile.read(), 0);
     /// ```
-    pub const fn new(value: T) -> Volatile<T> {
+    pub const fn new(reference: R) -> Volatile<R> {
         Volatile {
-            value,
+            reference,
+            access: PhantomData,
+        }
+    }
+
+    pub const fn new_read_only(reference: R) -> Volatile<R, ReadOnly> {
+        Volatile {
+            reference,
+            access: PhantomData,
+        }
+    }
+
+    pub const fn new_write_only(reference: R) -> Volatile<R, WriteOnly> {
+        Volatile {
+            reference,
             access: PhantomData,
         }
     }
 }
 
-impl<T: Copy, A> Volatile<&T, A> {
+impl<T, A> Volatile<&T, A>
+where
+    T: Copy,
+{
     /// Performs a volatile read of the contained value.
     ///
     /// Returns a copy of the read value. Volatile reads are guaranteed not to be optimized
@@ -78,7 +95,7 @@ impl<T: Copy, A> Volatile<&T, A> {
         A: Readable,
     {
         // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { ptr::read_volatile(self.value) }
+        unsafe { ptr::read_volatile(self.reference) }
     }
 }
 
@@ -94,17 +111,17 @@ impl<T: Copy, A> Volatile<&mut T, A> {
     /// ```rust
     /// use volatile::Volatile;
     ///
-    /// let mut value = 42;
+    /// let mut value = 10;
     /// let volatile = Volatile::new(&mut value);
     ///
-    /// assert_eq!(volatile.read(), 42);
+    /// assert_eq!(volatile.read(), 10);
     /// ```
     pub fn read(&self) -> T
     where
         A: Readable,
     {
         // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { ptr::read_volatile(self.value) }
+        unsafe { ptr::read_volatile(self.reference) }
     }
 
     /// Performs a volatile write, setting the contained value to the given `value`.
@@ -129,7 +146,7 @@ impl<T: Copy, A> Volatile<&mut T, A> {
         A: Writable,
     {
         // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { ptr::write_volatile(self.value, value) };
+        unsafe { ptr::write_volatile(self.reference, value) };
     }
 
     /// Updates the contained value using the given closure and volatile instructions.
@@ -158,25 +175,25 @@ impl<T: Copy, A> Volatile<&mut T, A> {
     }
 }
 
-impl<T: Copy, A> Volatile<&[T], A> {
+impl<T, A> Volatile<&[T], A> {
     pub fn index<I>(&self, index: I) -> Volatile<&I::Output, A>
     where
         I: SliceIndex<[T]>,
     {
         Volatile {
-            value: self.value.index(index),
+            reference: self.reference.index(index),
             access: self.access,
         }
     }
 }
 
-impl<T: Copy, A> Volatile<&mut [T], A> {
+impl<T, A> Volatile<&mut [T], A> {
     pub fn index<I>(&self, index: I) -> Volatile<&I::Output, A>
     where
         I: SliceIndex<[T]>,
     {
         Volatile {
-            value: self.value.index(index),
+            reference: self.reference.index(index),
             access: self.access,
         }
     }
@@ -186,7 +203,7 @@ impl<T: Copy, A> Volatile<&mut [T], A> {
         I: SliceIndex<[T]>,
     {
         Volatile {
-            value: self.value.index_mut(index),
+            reference: self.reference.index_mut(index),
             access: self.access,
         }
     }
