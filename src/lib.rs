@@ -189,6 +189,38 @@ where
         }
     }
 
+    /// Copies all elements from `self` into `dst`, using a volatile memcpy.
+    ///
+    /// The length of `dst` must be the same as `self`.
+    ///
+    /// The method is only available with the `nightly` feature enabled (requires a nightly
+    /// Rust compiler).
+    ///
+    /// ## Panics
+    ///
+    /// This function will panic if the two slices have different lengths.
+    ///
+    /// ## Examples
+    ///
+    /// Copying two elements from a volatile slice:
+    ///
+    /// ```
+    /// use volatile::Volatile;
+    ///
+    /// let src = [1, 2];
+    /// // the `Volatile` type does not work with arrays, so convert `src` to a slice
+    /// let slice = &src[..];
+    /// let volatile = Volatile::new(slice);
+    /// let mut dst = [5, 0, 0];
+    ///
+    /// // Because the slices have to be the same length,
+    /// // we slice the destination slice from three elements
+    /// // to two. It will panic if we don't do this.
+    /// volatile.copy_into_slice(&mut dst[1..]);
+    ///
+    /// assert_eq!(src, [1, 2]);
+    /// assert_eq!(dst, [5, 1, 2]);
+    /// ```
     #[cfg(feature = "nightly")]
     pub fn copy_into_slice(&self, dst: &mut [T])
     where
@@ -212,13 +244,16 @@ where
     ///
     /// The length of `src` must be the same as `self`.
     ///
+    /// The method is only available with the `nightly` feature enabled (requires a nightly
+    /// Rust compiler).
+    ///
     /// ## Panics
     ///
     /// This function will panic if the two slices have different lengths.
     ///
     /// ## Examples
     ///
-    /// Copying two elements from a slice into another:
+    /// Copying two elements from a slice into a volatile slice:
     ///
     /// ```
     /// use volatile::Volatile;
