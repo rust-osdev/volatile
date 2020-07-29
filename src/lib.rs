@@ -208,7 +208,7 @@ impl<T: Copy> ReadOnly<T> {
 /// A volatile wrapper which only allows write operations.
 ///
 /// The size of this struct is the same as the contained type.
-#[derive(Debug, Clone, Default)]
+#[derive(Default)]
 pub struct WriteOnly<T: Copy>(Volatile<T>);
 
 impl<T: Copy> WriteOnly<T> {
