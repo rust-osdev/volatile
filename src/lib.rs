@@ -9,7 +9,7 @@
 
 #![no_std]
 
-pub use crate::access::{ReadWrite, Readable, Writable};
+use access::{ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
 use core::{
     marker::PhantomData,
     ops::{Index, IndexMut},
@@ -17,7 +17,8 @@ use core::{
     slice::SliceIndex,
 };
 
-mod access;
+/// Allows creating read-only and write-only `Volatile` values.
+pub mod access;
 
 /// A wrapper type around a reference to a volatile variable.
 ///
