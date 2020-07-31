@@ -11,7 +11,8 @@ repository = "https://github.com/phil-opp/volatile"
 [dependencies]
 
 [features]
-nightly = []
+# Enable unstable features; requires Rust nightly; might break on compiler updates
+unstable = []
 
 [package.metadata.release]
 no-dev-version = true

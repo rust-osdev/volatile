@@ -8,12 +8,14 @@
 //! These wrappers do not depend on the standard library and never panic.
 
 #![no_std]
-#![cfg_attr(feature = "nightly", feature(core_intrinsics))]
-#![cfg_attr(feature = "nightly", feature(const_generics))]
-#![cfg_attr(feature = "nightly", allow(incomplete_features))]
+#![cfg_attr(feature = "unstable", feature(core_intrinsics))]
+#![cfg_attr(feature = "unstable", feature(const_generics))]
+#![cfg_attr(feature = "unstable", allow(incomplete_features))]
+
+//#![warn(missing_docs)]
 
 use access::{ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
-#[cfg(feature = "nightly")]
+#[cfg(feature = "unstable")]
 use core::intrinsics;
 use core::{
     marker::PhantomData,
@@ -223,7 +225,7 @@ where
     /// assert_eq!(src, [1, 2]);
     /// assert_eq!(dst, [5, 1, 2]);
     /// ```
-    #[cfg(feature = "nightly")]
+    #[cfg(feature = "unstable")]
     pub fn copy_into_slice(&self, dst: &mut [T])
     where
         T: Copy,
@@ -274,7 +276,7 @@ where
     /// assert_eq!(src, [1, 2, 3, 4]);
     /// assert_eq!(dst, [3, 4]);
     /// ```
-    #[cfg(feature = "nightly")]
+    #[cfg(feature = "unstable")]
     pub fn copy_from_slice(&mut self, src: &[T])
     where
         T: Copy,
@@ -299,7 +301,7 @@ where
 ///
 /// These methods are only available with the `nightly` feature enabled (requires a nightly
 /// Rust compiler).
-#[cfg(feature = "nightly")]
+#[cfg(feature = "unstable")]
 impl<R, A, T, const N: usize> Volatile<R, A>
 where
     R: Deref<Target = [T; N]>,
