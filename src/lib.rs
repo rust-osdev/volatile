@@ -12,7 +12,7 @@
 #![cfg_attr(feature = "unstable", feature(const_generics))]
 #![cfg_attr(feature = "unstable", allow(incomplete_features))]
 
-//#![warn(missing_docs)]
+#![warn(missing_docs)]
 
 use access::{ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
 #[cfg(feature = "unstable")]
