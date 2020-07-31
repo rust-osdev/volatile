@@ -22,7 +22,7 @@ use core::{
     ops::Deref,
     ops::{DerefMut, Index, IndexMut},
     ptr,
-    slice::SliceIndex,
+    slice::SliceIndex, fmt,
 };
 
 /// Allows creating read-only and write-only `Volatile` values.
@@ -36,7 +36,7 @@ pub mod access;
 /// The size of this struct is the same as the size of the contained type.
 ///
 /// TODO: read/write permissions
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
 #[repr(transparent)]
 pub struct Volatile<R, A = ReadWrite> {
     reference: R,
@@ -437,6 +437,18 @@ where
             reference: &mut *self.reference,
             access: self.access,
         }
+    }
+}
+
+impl<R, T, A> fmt::Debug for Volatile<R, A> where R: Deref<Target = T>, T:Copy + fmt::Debug, A: Readable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Volatile").field(&self.read()).finish()
+    }
+}
+
+impl<R> fmt::Debug for Volatile<R, WriteOnly> where R: Deref {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Volatile").field(&"[write-only]").finish()
     }
 }
 
