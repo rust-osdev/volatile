@@ -43,19 +43,29 @@ pub struct Volatile<R, A = ReadWrite> {
     access: PhantomData<A>,
 }
 
-/// Construction functions
+/// Constructor functions
+///
+/// These functions allow to construct a new `Volatile` instance from a reference type. While
+/// the `new` function creates a `Volatile` instance with unrestricted access, there are also
+/// functions for creating read-only or write-only instances.
 impl<R> Volatile<R> {
-    /// Construct a new volatile instance wrapping the given reference.
+    /// Constructs a new volatile instance wrapping the given reference.
+    ///
+    /// While it is possible to construct `Volatile` instances from arbitrary values (including
+    /// non-reference values), most of the methods are only available when the wrapped type is
+    /// a reference. There are also special methods for some valus, for example slicing methods
+    /// if the wrapped value is a slice.
     ///
     /// ## Example
     ///
     /// ```rust
     /// use volatile::Volatile;
     ///
-    /// let value = 0u32;
+    /// let mut value = 0u32;
     ///
-    /// let volatile = Volatile::new(&value);
-    /// assert_eq!(volatile.read(), 0);
+    /// let mut volatile = Volatile::new(&mut value);
+    /// volatile.write(1);
+    /// assert_eq!(volatile.read(), 1);
     /// ```
     pub const fn new(reference: R) -> Volatile<R> {
         Volatile {
@@ -64,6 +74,37 @@ impl<R> Volatile<R> {
         }
     }
 
+    /// Constructs a new read-only volatile instance wrapping the given reference.
+    ///
+    /// This is equivalent to the `new` function with the difference that the returned
+    /// `Volatile` instance does not permit write operations. This is for example useful
+    /// with memory-mapped hardware registers that are defined as read-only by the hardware.
+    ///
+    /// ## Example
+    ///
+    /// Reading is allowed:
+    ///
+    /// ```rust
+    /// use volatile::Volatile;
+    ///
+    /// let value = 0u32;
+    ///
+    /// let volatile = Volatile::new_read_only(&value);
+    /// assert_eq!(volatile.read(), 0);
+    /// ```
+    ///
+    /// But writing is not:
+    ///
+    /// ```compile_fail
+    /// use volatile::Volatile;
+    ///
+    /// let mut value = 0u32;
+    ///
+    /// let mut volatile = Volatile::new_read_only(&mut value);
+    /// volatile.write(1);
+    /// //ERROR: ^^^^^ the trait `volatile::access::Writable` is not implemented
+    /// //             for `volatile::access::ReadOnly`
+    /// ```
     pub const fn new_read_only(reference: R) -> Volatile<R, ReadOnly> {
         Volatile {
             reference,
@@ -71,6 +112,37 @@ impl<R> Volatile<R> {
         }
     }
 
+    /// Constructs a new write-only volatile instance wrapping the given reference.
+    ///
+    /// This is equivalent to the `new` function with the difference that the returned
+    /// `Volatile` instance does not permit read operations. This is for example useful
+    /// with memory-mapped hardware registers that are defined as write-only by the hardware.
+    ///
+    /// ## Example
+    ///
+    /// Writing is allowed:
+    ///
+    /// ```rust
+    /// use volatile::Volatile;
+    ///
+    /// let mut value = 0u32;
+    ///
+    /// let mut volatile = Volatile::new_write_only(&mut value);
+    /// volatile.write(1);
+    /// ```
+    ///
+    /// But reading is not:
+    ///
+    /// ```compile_fail
+    /// use volatile::Volatile;
+    ///
+    /// let value = 0u32;
+    ///
+    /// let volatile = Volatile::new_write_only(&value);
+    /// volatile.read();
+    /// //ERROR: ^^^^ the trait `volatile::access::Readable` is not implemented
+    /// //            for `volatile::access::WriteOnly`
+    /// ```
     pub const fn new_write_only(reference: R) -> Volatile<R, WriteOnly> {
         Volatile {
             reference,
