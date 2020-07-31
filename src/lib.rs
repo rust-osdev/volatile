@@ -53,8 +53,11 @@ impl<R> Volatile<R> {
     ///
     /// While it is possible to construct `Volatile` instances from arbitrary values (including
     /// non-reference values), most of the methods are only available when the wrapped type is
-    /// a reference. There are also special methods for some valus, for example slicing methods
-    /// if the wrapped value is a slice.
+    /// a reference. The only reason that we don't forbid non-reference types in the constructor
+    /// functions is that the Rust compiler does not support trait bounds on generic `const`
+    /// functions yet. When this becomes possible, we will release a new version of this library
+    /// with removed support for non-references. For these reasons it is not recommended to use
+    /// the `Volatile` type only with references.
     ///
     /// ## Example
     ///
