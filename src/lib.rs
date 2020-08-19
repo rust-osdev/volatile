@@ -40,7 +40,7 @@ pub mod access;
 /// to `ReadWrite`, which allows all operations.
 ///
 /// The size of this struct is the same as the size of the contained reference.
-#[derive(Default, Clone)]
+#[derive(Clone)]
 #[repr(transparent)]
 pub struct Volatile<R, A = ReadWrite> {
     reference: R,
