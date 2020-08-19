@@ -391,6 +391,38 @@ impl<T, R, A> Volatile<R, A>
 where
     R: Deref<Target = [T]>,
 {
+    /// Applies the index operation on the wrapped slice.
+    ///
+    /// Returns a shared `Volatile` reference to the resulting subslice.
+    ///
+    /// This is a convenience method for the `map(|slice| slice.index(index))` operation, so it
+    /// has the same behavior as the indexing operation on slice (e.g. panic if index is
+    /// out-of-bounds).
+    ///
+    /// ## Examples
+    ///
+    /// Accessing a single slice element:
+    ///
+    /// ```
+    /// use volatile::Volatile;
+    ///
+    /// let array = [1, 2, 3];
+    /// let slice = &array[..];
+    /// let volatile = Volatile::new(slice);
+    /// assert_eq!(volatile.index(1).read(), 2);
+    /// ```
+    ///
+    /// Accessing a subslice:
+    ///
+    /// ```
+    /// use volatile::Volatile;
+    ///
+    /// let array = [1, 2, 3];
+    /// let slice = &array[..];
+    /// let volatile = Volatile::new(slice);
+    /// let subslice = volatile.index(1..);
+    /// assert_eq!(subslice.index(0).read(), 2);
+    /// ```
     pub fn index<'a, I>(&'a self, index: I) -> Volatile<&'a I::Output, A>
     where
         I: SliceIndex<[T]>,
@@ -399,6 +431,40 @@ where
         self.map(|slice| slice.index(index))
     }
 
+    /// Applies the mutable index operation on the wrapped slice.
+    ///
+    /// Returns a mutable `Volatile` reference to the resulting subslice.
+    ///
+    /// This is a convenience method for the `map_mut(|slice| slice.index_mut(index))`
+    /// operation, so it has the same behavior as the indexing operation on slice
+    /// (e.g. panic if index is out-of-bounds).
+    ///
+    /// ## Examples
+    ///
+    /// Accessing a single slice element:
+    ///
+    /// ```
+    /// use volatile::Volatile;
+    ///
+    /// let mut array = [1, 2, 3];
+    /// let slice = &mut array[..];
+    /// let mut volatile = Volatile::new(slice);
+    /// volatile.index_mut(1).write(6);
+    /// assert_eq!(volatile.index(1).read(), 6);
+    /// ```
+    ///
+    /// Accessing a subslice:
+    ///
+    /// ```
+    /// use volatile::Volatile;
+    ///
+    /// let mut array = [1, 2, 3];
+    /// let slice = &mut array[..];
+    /// let mut volatile = Volatile::new(slice);
+    /// let mut subslice = volatile.index_mut(1..);
+    /// subslice.index_mut(0).write(6);
+    /// assert_eq!(subslice.index(0).read(), 6);
+    /// ```
     pub fn index_mut<'a, I>(&'a mut self, index: I) -> Volatile<&mut I::Output, A>
     where
         I: SliceIndex<[T]>,
