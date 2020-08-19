@@ -3,7 +3,7 @@
 //! by the compiler, and are useful in many low-level systems programming and concurrent contexts.
 //!
 //! The wrapper types *do not* enforce any atomicity guarantees; to also get atomicity, consider
-//! looking at the `Atomic` wrapper type found in `libcore` or `libstd`.
+//! looking at the `Atomic` wrapper types found in `libcore` or `libstd`.
 //!
 //! These wrappers do not depend on the standard library and never panic.
 
@@ -28,14 +28,18 @@ use core::{
 /// Allows creating read-only and write-only `Volatile` values.
 pub mod access;
 
-/// A wrapper type around a reference to a volatile variable.
+/// Wraps a reference to make accesses to referenced value volatile.
 ///
 /// Allows volatile reads and writes on the referenced value. The referenced value needs to
-/// be `Copy`, as volatile reads and writes take and return copies of the value.
+/// be `Copy` for reading and writing, as volatile reads and writes take and return copies
+/// of the value.
 ///
-/// The size of this struct is the same as the size of the contained type.
+/// Since not all volatile resources (e.g. memory mapped device registers) are both readable
+/// and writable, this type supports limiting the allowed access types through an optional second
+/// generic parameter `A` that can be one of `ReadWrite`, `ReadOnly`, or `WriteOnly`. It defaults
+/// to `ReadWrite`, which allows all operations.
 ///
-/// TODO: read/write permissions
+/// The size of this struct is the same as the size of the contained reference.
 #[derive(Default, Clone)]
 #[repr(transparent)]
 pub struct Volatile<R, A = ReadWrite> {
@@ -43,7 +47,7 @@ pub struct Volatile<R, A = ReadWrite> {
     access: PhantomData<A>,
 }
 
-/// Constructor functions
+/// Constructor functions for creating new values
 ///
 /// These functions allow to construct a new `Volatile` instance from a reference type. While
 /// the `new` function creates a `Volatile` instance with unrestricted access, there are also
@@ -164,7 +168,8 @@ where
     ///
     /// Returns a copy of the read value. Volatile reads are guaranteed not to be optimized
     /// away by the compiler, but by themselves do not have atomic ordering
-    /// guarantees. To also get atomicity, consider looking at the `Atomic` wrapper type.
+    /// guarantees. To also get atomicity, consider looking at the `Atomic` wrapper types of
+    /// the standard/`core` library.
     ///
     /// ## Examples
     ///
@@ -191,7 +196,7 @@ where
     ///
     /// Volatile writes are guaranteed to not be optimized away by the compiler, but by
     /// themselves do not have atomic ordering guarantees. To also get atomicity, consider
-    /// looking at the `Atomic` wrapper type.
+    /// looking at the `Atomic` wrapper types of the standard/`core` library.
     ///
     /// ## Example
     ///
