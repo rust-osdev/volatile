@@ -158,6 +158,93 @@ impl<R> Volatile<R> {
     }
 }
 
+/// Methods for references to `Copy` types
+impl<R, T, A> Volatile<R, A>
+where
+    R: Deref<Target = T>,
+    T: Copy,
+{
+    /// Performs a volatile read of the contained value.
+    ///
+    /// Returns a copy of the read value. Volatile reads are guaranteed not to be optimized
+    /// away by the compiler, but by themselves do not have atomic ordering
+    /// guarantees. To also get atomicity, consider looking at the `Atomic` wrapper types of
+    /// the standard/`core` library.
+    ///
+    /// ## Examples
+    ///
+    /// ```rust
+    /// use volatile::Volatile;
+    ///
+    /// let value = 42;
+    /// let shared_reference = Volatile::new(&value);
+    /// assert_eq!(shared_reference.read(), 42);
+    ///
+    /// let mut value = 50;
+    /// let mut_reference = Volatile::new(&mut value);
+    /// assert_eq!(mut_reference.read(), 50);
+    /// ```
+    pub fn read(&self) -> T
+    where
+        A: Readable,
+    {
+        // UNSAFE: Safe, as we know that our internal value exists.
+        unsafe { ptr::read_volatile(&*self.reference) }
+    }
+
+    /// Performs a volatile write, setting the contained value to the given `value`.
+    ///
+    /// Volatile writes are guaranteed to not be optimized away by the compiler, but by
+    /// themselves do not have atomic ordering guarantees. To also get atomicity, consider
+    /// looking at the `Atomic` wrapper types of the standard/`core` library.
+    ///
+    /// ## Example
+    ///
+    /// ```rust
+    /// use volatile::Volatile;
+    ///
+    /// let mut value = 42;
+    /// let mut volatile = Volatile::new(&mut value);
+    /// volatile.write(50);
+    ///
+    /// assert_eq!(volatile.read(), 50);
+    /// ```
+    pub fn write(&mut self, value: T)
+    where
+        A: Writable,
+        R: DerefMut,
+    {
+        // UNSAFE: Safe, as we know that our internal value exists.
+        unsafe { ptr::write_volatile(&mut *self.reference, value) };
+    }
+
+    /// Updates the contained value using the given closure and volatile instructions.
+    ///
+    /// Performs a volatile read of the contained value, passes a mutable reference to it to the
+    /// function `f`, and then performs a volatile write of the (potentially updated) value back to
+    /// the contained value.
+    ///
+    /// ```rust
+    /// use volatile::Volatile;
+    ///
+    /// let mut value = 42;
+    /// let mut volatile = Volatile::new(&mut value);
+    /// volatile.update(|val| *val += 1);
+    ///
+    /// assert_eq!(volatile.read(), 43);
+    /// ```
+    pub fn update<F>(&mut self, f: F)
+    where
+        A: Readable + Writable,
+        R: DerefMut,
+        F: FnOnce(&mut T),
+    {
+        let mut value = self.read();
+        f(&mut value);
+        self.write(value);
+    }
+}
+
 /// Method for extracting the wrapped value.
 impl<R, A> Volatile<R, A> {
     /// Extracts the inner value stored in the wrapper type.
@@ -296,93 +383,6 @@ where
             reference: f(&mut self.reference),
             access: self.access,
         }
-    }
-}
-
-/// Methods for references to `Copy` types
-impl<R, T, A> Volatile<R, A>
-where
-    R: Deref<Target = T>,
-    T: Copy,
-{
-    /// Performs a volatile read of the contained value.
-    ///
-    /// Returns a copy of the read value. Volatile reads are guaranteed not to be optimized
-    /// away by the compiler, but by themselves do not have atomic ordering
-    /// guarantees. To also get atomicity, consider looking at the `Atomic` wrapper types of
-    /// the standard/`core` library.
-    ///
-    /// ## Examples
-    ///
-    /// ```rust
-    /// use volatile::Volatile;
-    ///
-    /// let value = 42;
-    /// let shared_reference = Volatile::new(&value);
-    /// assert_eq!(shared_reference.read(), 42);
-    ///
-    /// let mut value = 50;
-    /// let mut_reference = Volatile::new(&mut value);
-    /// assert_eq!(mut_reference.read(), 50);
-    /// ```
-    pub fn read(&self) -> T
-    where
-        A: Readable,
-    {
-        // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { ptr::read_volatile(&*self.reference) }
-    }
-
-    /// Performs a volatile write, setting the contained value to the given `value`.
-    ///
-    /// Volatile writes are guaranteed to not be optimized away by the compiler, but by
-    /// themselves do not have atomic ordering guarantees. To also get atomicity, consider
-    /// looking at the `Atomic` wrapper types of the standard/`core` library.
-    ///
-    /// ## Example
-    ///
-    /// ```rust
-    /// use volatile::Volatile;
-    ///
-    /// let mut value = 42;
-    /// let mut volatile = Volatile::new(&mut value);
-    /// volatile.write(50);
-    ///
-    /// assert_eq!(volatile.read(), 50);
-    /// ```
-    pub fn write(&mut self, value: T)
-    where
-        A: Writable,
-        R: DerefMut,
-    {
-        // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { ptr::write_volatile(&mut *self.reference, value) };
-    }
-
-    /// Updates the contained value using the given closure and volatile instructions.
-    ///
-    /// Performs a volatile read of the contained value, passes a mutable reference to it to the
-    /// function `f`, and then performs a volatile write of the (potentially updated) value back to
-    /// the contained value.
-    ///
-    /// ```rust
-    /// use volatile::Volatile;
-    ///
-    /// let mut value = 42;
-    /// let mut volatile = Volatile::new(&mut value);
-    /// volatile.update(|val| *val += 1);
-    ///
-    /// assert_eq!(volatile.read(), 43);
-    /// ```
-    pub fn update<F>(&mut self, f: F)
-    where
-        A: Readable + Writable,
-        R: DerefMut,
-        F: FnOnce(&mut T),
-    {
-        let mut value = self.read();
-        f(&mut value);
-        self.write(value);
     }
 }
 
