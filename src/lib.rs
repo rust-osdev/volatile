@@ -610,7 +610,7 @@ where
     /// assert_eq!(dst, [1, 2]);
     /// ```
     pub fn as_slice(&self) -> Volatile<&[T], A> {
-        self.map(|array| &*array)
+        self.map(|array| &array[..])
     }
 
     /// Converts a mutable array reference to a mutable slice.
@@ -639,7 +639,7 @@ where
     where
         R: DerefMut,
     {
-        self.map_mut(|array| &mut *array)
+        self.map_mut(|array| &mut array[..])
     }
 }
 
