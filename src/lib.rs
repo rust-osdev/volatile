@@ -396,10 +396,7 @@ where
         I: SliceIndex<[T]>,
         T: 'a,
     {
-        Volatile {
-            reference: self.reference.index(index),
-            access: self.access,
-        }
+        self.map(|slice| slice.index(index))
     }
 
     pub fn index_mut<'a, I>(&'a mut self, index: I) -> Volatile<&mut I::Output, A>
@@ -408,10 +405,7 @@ where
         R: DerefMut,
         T: 'a,
     {
-        Volatile {
-            reference: self.reference.index_mut(index),
-            access: self.access,
-        }
+        self.map_mut(|slice| slice.index_mut(index))
     }
 
     /// Copies all elements from `self` into `dst`, using a volatile memcpy.
