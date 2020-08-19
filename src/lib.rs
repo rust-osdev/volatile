@@ -158,6 +158,147 @@ impl<R> Volatile<R> {
     }
 }
 
+/// Method for extracting the wrapped value.
+impl<R, A> Volatile<R, A> {
+    /// Extracts the inner value stored in the wrapper type.
+    ///
+    /// This method gives direct access to the wrapped reference and thus allows
+    /// non-volatile access again. This is seldom what you want since there is usually
+    /// a reason that a reference is wrapped in `Volatile`. However, in some cases it might
+    /// be required or useful to use the `read_volatile`/`write_volatile` pointer methods of
+    /// the standard library directly, which this method makes possible.
+    ///
+    /// Since no memory safety violation can occur when accessing the referenced value using
+    /// non-volatile operations, this method is safe. However, it _can_ lead to bugs at the
+    /// application level, so this method should be used with care.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use volatile::Volatile;
+    ///
+    /// let mut value = 42;
+    /// let mut volatile = Volatile::new(&mut value);
+    /// volatile.write(50);
+    /// let unwrapped: &mut i32 = volatile.extract_inner();
+    ///
+    /// assert_eq!(*unwrapped, 50); // non volatile access, be careful!
+    /// ```
+    pub fn extract_inner(self) -> R {
+        self.reference
+    }
+}
+
+/// Transformation methods for accessing struct fields
+impl<R, T, A> Volatile<R, A>
+where
+    R: Deref<Target = T>,
+    T: ?Sized,
+{
+    /// Constructs a new `Volatile` reference by mapping the wrapped value.
+    ///
+    /// This method is useful for accessing individual fields of volatile structs.
+    ///
+    /// Note that this method gives temporary access to the wrapped reference, which allows
+    /// accessing the value in a non-volatile way. This is normally not what you want, so
+    /// **this method should only be used for reference-to-reference transformations**.
+    ///
+    /// ## Examples
+    ///
+    /// Accessing a struct field:
+    ///
+    /// ```
+    /// use volatile::Volatile;
+    ///
+    /// struct Example { field_1: u32, field_2: u8, }
+    /// let mut value = Example { field_1: 15, field_2: 255 };
+    /// let mut volatile = Volatile::new(&mut value);
+    ///
+    /// // construct a volatile reference to a field
+    /// let field_2 = volatile.map(|example| &example.field_2);
+    /// assert_eq!(field_2.read(), 255);
+    /// ```
+    ///
+    /// Don't misuse this method to do a non-volatile read of the referenced value:
+    ///
+    /// ```
+    /// use volatile::Volatile;
+    ///
+    /// let mut value = 5;
+    /// let mut volatile = Volatile::new(&mut value);
+    ///
+    /// // DON'T DO THIS:
+    /// let mut readout = 0;
+    /// volatile.map(|value| {
+    ///    readout = *value; // non-volatile read, might lead to bugs
+    ///    value
+    /// });
+    /// ```
+    pub fn map<'a, F, U>(&'a self, f: F) -> Volatile<&'a U, A>
+    where
+        F: FnOnce(&'a T) -> &'a U,
+        U: ?Sized,
+        T: 'a,
+    {
+        Volatile {
+            reference: f(self.reference.deref()),
+            access: self.access,
+        }
+    }
+
+    /// Constructs a new mutable `Volatile` reference by mapping the wrapped value.
+    ///
+    /// This method is useful for accessing individual fields of volatile structs.
+    ///
+    /// Note that this method gives temporary access to the wrapped reference, which allows
+    /// accessing the value in a non-volatile way. This is normally not what you want, so
+    /// **this method should only be used for reference-to-reference transformations**.
+    ///
+    /// ## Examples
+    ///
+    /// Accessing a struct field:
+    ///
+    /// ```
+    /// use volatile::Volatile;
+    ///
+    /// struct Example { field_1: u32, field_2: u8, }
+    /// let mut value = Example { field_1: 15, field_2: 255 };
+    /// let mut volatile = Volatile::new(&mut value);
+    ///
+    /// // construct a volatile reference to a field
+    /// let mut field_2 = volatile.map_mut(|example| &mut example.field_2);
+    /// field_2.write(128);
+    /// assert_eq!(field_2.read(), 128);
+    /// ```
+    ///
+    /// Don't misuse this method to do a non-volatile read or write of the referenced value:
+    ///
+    /// ```
+    /// use volatile::Volatile;
+    ///
+    /// let mut value = 5;
+    /// let mut volatile = Volatile::new(&mut value);
+    ///
+    /// // DON'T DO THIS:
+    /// volatile.map_mut(|value| {
+    ///    *value = 10; // non-volatile write, might lead to bugs
+    ///    value
+    /// });
+    /// ```
+    pub fn map_mut<'a, F, U>(&'a mut self, f: F) -> Volatile<&'a mut U, A>
+    where
+        F: FnOnce(&mut T) -> &mut U,
+        R: DerefMut,
+        U: ?Sized,
+        T: 'a,
+    {
+        Volatile {
+            reference: f(&mut self.reference),
+            access: self.access,
+        }
+    }
+}
+
 /// Methods for references to `Copy` types
 impl<R, T, A> Volatile<R, A>
 where
@@ -500,5 +641,25 @@ mod tests {
         let mut volatile = Volatile::new(&mut val[..]);
         volatile.index_mut(0).update(|v| *v += 1);
         assert_eq!(val, [2, 2, 3]);
+    }
+
+    #[test]
+    fn test_struct() {
+        struct S {
+            field_1: u32,
+            field_2: bool,
+        }
+
+        let mut val = S {
+            field_1: 60,
+            field_2: true,
+        };
+        let mut volatile = Volatile::new(&mut val);
+        volatile.map_mut(|s| &mut s.field_1).update(|v| *v += 1);
+        let mut field_2 = volatile.map_mut(|s| &mut s.field_2);
+        assert!(field_2.read());
+        field_2.write(false);
+        assert_eq!(volatile.map(|s| &s.field_1).read(), 61);
+        assert_eq!(volatile.map(|s| &s.field_2).read(), false);
     }
 }
