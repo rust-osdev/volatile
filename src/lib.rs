@@ -28,7 +28,7 @@ use core::{
 /// Allows creating read-only and write-only `Volatile` values.
 pub mod access;
 
-/// Wraps a reference to make accesses to referenced value volatile.
+/// Wraps a reference to make accesses to the referenced value volatile.
 ///
 /// Allows volatile reads and writes on the referenced value. The referenced value needs to
 /// be `Copy` for reading and writing, as volatile reads and writes take and return copies
