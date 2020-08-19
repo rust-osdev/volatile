@@ -544,10 +544,7 @@ where
     /// assert_eq!(dst, [1, 2]);
     /// ```
     pub fn as_slice(&self) -> Volatile<&[T], A> {
-        Volatile {
-            reference: &*self.reference,
-            access: self.access,
-        }
+        self.map(|array| &*array)
     }
 
     /// Converts a mutable array reference to a mutable slice.
@@ -576,10 +573,7 @@ where
     where
         R: DerefMut,
     {
-        Volatile {
-            reference: &mut *self.reference,
-            access: self.access,
-        }
+        self.map_mut(|array| &mut *array)
     }
 }
 
