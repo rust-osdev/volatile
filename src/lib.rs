@@ -11,18 +11,18 @@
 #![cfg_attr(feature = "unstable", feature(core_intrinsics))]
 #![cfg_attr(feature = "unstable", feature(const_generics))]
 #![cfg_attr(feature = "unstable", allow(incomplete_features))]
-
 #![warn(missing_docs)]
 
 use access::{ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
 #[cfg(feature = "unstable")]
 use core::intrinsics;
 use core::{
+    fmt,
     marker::PhantomData,
     ops::Deref,
     ops::{DerefMut, Index, IndexMut},
     ptr,
-    slice::SliceIndex, fmt,
+    slice::SliceIndex,
 };
 
 /// Allows creating read-only and write-only `Volatile` values.
@@ -448,13 +448,21 @@ where
     }
 }
 
-impl<R, T, A> fmt::Debug for Volatile<R, A> where R: Deref<Target = T>, T:Copy + fmt::Debug, A: Readable {
+impl<R, T, A> fmt::Debug for Volatile<R, A>
+where
+    R: Deref<Target = T>,
+    T: Copy + fmt::Debug,
+    A: Readable,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Volatile").field(&self.read()).finish()
     }
 }
 
-impl<R> fmt::Debug for Volatile<R, WriteOnly> where R: Deref {
+impl<R> fmt::Debug for Volatile<R, WriteOnly>
+where
+    R: Deref,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Volatile").field(&"[write-only]").finish()
     }
