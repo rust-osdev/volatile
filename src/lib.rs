@@ -10,12 +10,11 @@
 #![no_std]
 #![cfg_attr(feature = "unstable", feature(core_intrinsics))]
 #![cfg_attr(feature = "unstable", feature(const_generics))]
+#![cfg_attr(feature = "unstable", feature(slice_check_range))]
 #![cfg_attr(feature = "unstable", allow(incomplete_features))]
 #![warn(missing_docs)]
 
 use access::{ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
-#[cfg(feature = "unstable")]
-use core::intrinsics;
 use core::{
     fmt,
     marker::PhantomData,
@@ -23,6 +22,11 @@ use core::{
     ops::{DerefMut, Index, IndexMut},
     ptr,
     slice::SliceIndex,
+};
+#[cfg(feature = "unstable")]
+use core::{
+    intrinsics,
+    ops::{Range, RangeBounds},
 };
 
 /// Allows creating read-only and write-only `Volatile` values.
@@ -572,6 +576,53 @@ where
             intrinsics::volatile_copy_nonoverlapping_memory(
                 self.reference.as_mut_ptr(),
                 src.as_ptr(),
+                self.reference.len(),
+            );
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn copy_within(&mut self, src: impl RangeBounds<usize>, dest: usize)
+    where
+        T: Copy,
+        R: DerefMut,
+    {
+        // implementation taken from https://github.com/rust-lang/rust/blob/683d1bcd405727fcc9209f64845bd3b9104878b8/library/core/src/slice/mod.rs#L2726-L2738
+        let Range {
+            start: src_start,
+            end: src_end,
+        } = self.reference.check_range(src);
+        let count = src_end - src_start;
+        assert!(
+            dest <= self.reference.len() - count,
+            "dest is out of bounds"
+        );
+        // SAFETY: the conditions for `volatile_copy_memory` have all been checked above,
+        // as have those for `ptr::add`.
+        unsafe {
+            intrinsics::volatile_copy_memory(
+                self.reference.as_mut_ptr().add(dest),
+                self.reference.as_ptr().add(src_start),
+                count,
+            );
+        }
+    }
+}
+
+/// Methods for volatile byte slices
+impl<R, A> Volatile<R, A>
+where
+    R: Deref<Target = [u8]>,
+{
+    #[cfg(feature = "unstable")]
+    pub fn fill(&mut self, value: u8)
+    where
+        R: DerefMut,
+    {
+        unsafe {
+            intrinsics::volatile_set_memory(
+                self.reference.as_mut_ptr(),
+                value,
                 self.reference.len(),
             );
         }
