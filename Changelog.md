@@ -1,5 +1,7 @@
 # Unreleased
 
+- Small documentation and metadata improvements
+
 # 0.4.0 – 2020-09-21
 
 - Rewrite crate to operate on reference values ([#13](https://github.com/rust-osdev/volatile/pull/13))
