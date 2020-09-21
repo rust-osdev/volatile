@@ -6,7 +6,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["volatile"]
 description = "A simple volatile wrapper type"
 documentation = "https://docs.rs/volatile"
-repository = "https://github.com/phil-opp/volatile"
+repository = "https://github.com/rust-osdev/volatile"
 
 [dependencies]
 
