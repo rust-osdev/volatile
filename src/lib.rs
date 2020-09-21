@@ -4,8 +4,6 @@
 //!
 //! The wrapper types *do not* enforce any atomicity guarantees; to also get atomicity, consider
 //! looking at the `Atomic` wrapper types found in `libcore` or `libstd`.
-//!
-//! These wrappers do not depend on the standard library and never panic.
 
 #![no_std]
 #![cfg_attr(feature = "unstable", feature(core_intrinsics))]
