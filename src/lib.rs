@@ -482,7 +482,7 @@ where
     ///
     /// The length of `dst` must be the same as `self`.
     ///
-    /// The method is only available with the `nightly` feature enabled (requires a nightly
+    /// The method is only available with the `unstable` feature enabled (requires a nightly
     /// Rust compiler).
     ///
     /// ## Panics
@@ -533,7 +533,10 @@ where
     ///
     /// The length of `src` must be the same as `self`.
     ///
-    /// The method is only available with the `nightly` feature enabled (requires a nightly
+    /// This method is similar to the `slice::copy_from_slice` method of the standard library. The
+    /// difference is that this method performs a volatile copy.
+    ///
+    /// The method is only available with the `unstable` feature enabled (requires a nightly
     /// Rust compiler).
     ///
     /// ## Panics
@@ -581,6 +584,38 @@ where
         }
     }
 
+    /// Copies elements from one part of the slice to another part of itself, using a
+    /// volatile `memmove`.
+    ///
+    /// `src` is the range within `self` to copy from. `dest` is the starting index of the
+    /// range within `self` to copy to, which will have the same length as `src`. The two ranges
+    /// may overlap. The ends of the two ranges must be less than or equal to `self.len()`.
+    ///
+    /// This method is similar to the `slice::copy_within` method of the standard library. The
+    /// difference is that this method performs a volatile copy.
+    ///
+    /// This method is only available with the `unstable` feature enabled (requires a nightly
+    /// Rust compiler).
+    ///
+    /// ## Panics
+    ///
+    /// This function will panic if either range exceeds the end of the slice, or if the end
+    /// of `src` is before the start.
+    ///
+    /// ## Examples
+    ///
+    /// Copying four bytes within a slice:
+    ///
+    /// ```
+    /// use volatile::Volatile;
+    ///
+    /// let mut byte_array = *b"Hello, World!";
+    /// let mut slice: &mut [u8] = &mut byte_array[..];
+    /// let mut volatile = Volatile::new(slice);
+    ///
+    /// volatile.copy_within(1..5, 8);
+    ///
+    /// assert_eq!(&byte_array, b"Hello, Wello!");
     #[cfg(feature = "unstable")]
     pub fn copy_within(&mut self, src: impl RangeBounds<usize>, dest: usize)
     where
@@ -614,6 +649,25 @@ impl<R, A> Volatile<R, A>
 where
     R: Deref<Target = [u8]>,
 {
+    /// Sets all elements of the byte slice to the given `value` using a volatile `memset`.
+    ///
+    /// This method is similar to the `slice::fill` method of the standard library, with the
+    /// difference that this method performs a volatile write operation. Another difference
+    /// is that this method is only available for byte slices (not general `&mut [T]` slices)
+    /// because there currently isn't a instrinsic function that allows non-`u8` values.
+    ///
+    /// This method is only available with the `unstable` feature enabled (requires a nightly
+    /// Rust compiler).
+    ///
+    /// ## Example
+    ///
+    /// ```rust
+    /// use volatile::Volatile;
+    ///
+    /// let mut buf = Volatile::new(vec![0; 10]);
+    /// buf.fill(1);
+    /// assert_eq!(buf.extract_inner(), vec![1; 10]);
+    /// ```
     #[cfg(feature = "unstable")]
     pub fn fill(&mut self, value: u8)
     where
@@ -631,7 +685,7 @@ where
 
 /// Methods for converting arrays to slices
 ///
-/// These methods are only available with the `nightly` feature enabled (requires a nightly
+/// These methods are only available with the `unstable` feature enabled (requires a nightly
 /// Rust compiler).
 #[cfg(feature = "unstable")]
 impl<R, A, T, const N: usize> Volatile<R, A>
