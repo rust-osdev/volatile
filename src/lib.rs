@@ -27,6 +27,7 @@ use core::{
 use core::{
     intrinsics,
     ops::{Range, RangeBounds},
+    slice,
 };
 
 /// Allows creating read-only and write-only `Volatile` values.
@@ -626,7 +627,7 @@ where
         let Range {
             start: src_start,
             end: src_end,
-        } = self.reference.check_range(src);
+        } = slice::check_range(self.reference.len(), src);
         let count = src_end - src_start;
         assert!(
             dest <= self.reference.len() - count,
