@@ -1,5 +1,7 @@
 # Unreleased
 
+# 0.4.1 – 2020-09-21
+
 - Small documentation and metadata improvements
 
 # 0.4.0 – 2020-09-21
