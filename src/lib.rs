@@ -25,7 +25,6 @@ use core::{
 use core::{
     intrinsics,
     ops::{Range, RangeBounds},
-    slice,
 };
 
 /// Allows creating read-only and write-only `Volatile` values.
