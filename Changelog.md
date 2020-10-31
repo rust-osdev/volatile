@@ -1,5 +1,8 @@
 # Unreleased
 
+- Change `slice::check_range` to `RangeBounds::assert_len` ([#16](https://github.com/rust-osdev/volatile/pull/16))
+  - Fixes build on latest nightly.
+
 # 0.4.1 – 2020-09-21
 
 - Small documentation and metadata improvements
