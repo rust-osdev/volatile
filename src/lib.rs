@@ -8,7 +8,7 @@
 #![no_std]
 #![cfg_attr(feature = "unstable", feature(core_intrinsics))]
 #![cfg_attr(feature = "unstable", feature(const_generics))]
-#![cfg_attr(feature = "unstable", feature(slice_check_range))]
+#![cfg_attr(feature = "unstable", feature(range_bounds_assert_len))]
 #![cfg_attr(feature = "unstable", allow(incomplete_features))]
 #![warn(missing_docs)]
 
@@ -625,7 +625,7 @@ where
         let Range {
             start: src_start,
             end: src_end,
-        } = slice::check_range(self.reference.len(), src);
+        } = src.assert_len(self.reference.len());
         let count = src_end - src_start;
         assert!(
             dest <= self.reference.len() - count,
