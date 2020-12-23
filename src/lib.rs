@@ -746,6 +746,55 @@ where
     }
 }
 
+/// Methods for restricting access.
+impl<R> Volatile<R> {
+    /// Restricts access permissions to read-only.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use volatile::Volatile;
+    ///
+    /// let mut value: i16 = -4;
+    /// let mut volatile = Volatile::new(&mut value);
+    ///
+    /// let read_only = volatile.read_only();
+    /// assert_eq!(read_only.read(), -4);
+    /// // read_only.write(10); // compile-time error
+    /// ```
+    pub fn read_only(self) -> Volatile<R, ReadOnly> {
+        Volatile {
+            reference: self.reference,
+            access: PhantomData,
+        }
+    }
+
+    /// Restricts access permissions to write-only.
+    ///
+    /// ## Example
+    ///
+    /// Creating a write-only reference to a struct field:
+    ///
+    /// ```
+    /// use volatile::Volatile;
+    ///
+    /// struct Example { field_1: u32, field_2: u8, }
+    /// let mut value = Example { field_1: 15, field_2: 255 };
+    /// let mut volatile = Volatile::new(&mut value);
+    ///
+    /// // construct a volatile write-only reference to `field_2`
+    /// let mut field_2 = volatile.map_mut(|example| &mut example.field_2).write_only();
+    /// field_2.write(14);
+    /// // field_2.read(); // compile-time error
+    /// ```
+    pub fn write_only(self) -> Volatile<R, WriteOnly> {
+        Volatile {
+            reference: self.reference,
+            access: PhantomData,
+        }
+    }
+}
+
 impl<R, T, A> fmt::Debug for Volatile<R, A>
 where
     R: Deref<Target = T>,
