@@ -1,5 +1,7 @@
 # Unreleased
 
+# 0.4.3 – 2020-12-23
+
 - Add methods to restrict access ([#19](https://github.com/rust-osdev/volatile/pull/19))
 
 # 0.4.2 – 2020-10-31
