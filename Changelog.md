@@ -1,5 +1,8 @@
 # Unreleased
 
+-  Replace feature "range_bounds_assert_len" with "slice_range" ([#21](https://github.com/rust-osdev/volatile/pull/21))
+  - Fixes the `unstable` feature on the latest nightly.
+
 # 0.4.3 – 2020-12-23
 
 - Add methods to restrict access ([#19](https://github.com/rust-osdev/volatile/pull/19))
