@@ -10,6 +10,7 @@
 #![cfg_attr(feature = "unstable", feature(const_generics))]
 #![cfg_attr(feature = "unstable", feature(slice_range))]
 #![cfg_attr(feature = "unstable", allow(incomplete_features))]
+#![cfg_attr(all(feature = "unstable", test), feature(slice_as_chunks))]
 #![warn(missing_docs)]
 
 use access::{ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
@@ -868,5 +869,16 @@ mod tests {
         field_2.write(false);
         assert_eq!(volatile.map(|s| &s.field_1).read(), 61);
         assert_eq!(volatile.map(|s| &s.field_2).read(), false);
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn test_chunks() {
+        let mut val = [1, 2, 3, 4, 5, 6];
+        let mut volatile = Volatile::new(&mut val[..]);
+        let mut chunks = volatile.map_mut(|s| s.as_chunks_mut().0);
+        chunks.index_mut(1).write([10, 11, 12]);
+        assert_eq!(chunks.index(0).read(), [1, 2, 3]);
+        assert_eq!(chunks.index(1).read(), [10, 11, 12]);
     }
 }
