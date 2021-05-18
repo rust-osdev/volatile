@@ -9,24 +9,20 @@
 #![cfg_attr(feature = "unstable", feature(core_intrinsics))]
 #![cfg_attr(feature = "unstable", feature(const_generics))]
 #![cfg_attr(feature = "unstable", feature(slice_range))]
+#![cfg_attr(feature = "unstable", feature(slice_ptr_get))]
+#![cfg_attr(feature = "unstable", feature(slice_ptr_len))]
 #![cfg_attr(feature = "unstable", allow(incomplete_features))]
 #![cfg_attr(all(feature = "unstable", test), feature(slice_as_chunks))]
 #![warn(missing_docs)]
+#![deny(unsafe_op_in_unsafe_fn)]
 
 use access::{ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
-use core::{
-    fmt,
-    marker::PhantomData,
-    ops::Deref,
-    ops::{DerefMut, Index, IndexMut},
-    ptr,
-    slice::SliceIndex,
-};
+use core::{cell::UnsafeCell, fmt, marker::PhantomData, ptr};
 #[cfg(feature = "unstable")]
 use core::{
     intrinsics,
     ops::{Range, RangeBounds},
-    slice::range,
+    slice::{range, SliceIndex},
 };
 
 /// Allows creating read-only and write-only `Volatile` values.
@@ -46,8 +42,11 @@ pub mod access;
 /// The size of this struct is the same as the size of the contained reference.
 #[derive(Clone)]
 #[repr(transparent)]
-pub struct Volatile<R, A = ReadWrite> {
-    reference: R,
+pub struct Volatile<'a, T, A = ReadWrite>
+where
+    T: ?Sized,
+{
+    reference: &'a UnsafeCell<T>,
     access: PhantomData<A>,
 }
 
@@ -56,7 +55,10 @@ pub struct Volatile<R, A = ReadWrite> {
 /// These functions allow to construct a new `Volatile` instance from a reference type. While
 /// the `new` function creates a `Volatile` instance with unrestricted access, there are also
 /// functions for creating read-only or write-only instances.
-impl<R> Volatile<R> {
+impl<T> Volatile<'_, T>
+where
+    T: ?Sized,
+{
     /// Constructs a new volatile instance wrapping the given reference.
     ///
     /// While it is possible to construct `Volatile` instances from arbitrary values (including
@@ -78,95 +80,38 @@ impl<R> Volatile<R> {
     /// volatile.write(1);
     /// assert_eq!(volatile.read(), 1);
     /// ```
-    pub const fn new(reference: R) -> Volatile<R> {
+    pub unsafe fn new<A>(reference: &UnsafeCell<T>, access: A) -> Volatile<'_, T, A> {
         Volatile {
             reference,
             access: PhantomData,
         }
     }
 
-    /// Constructs a new read-only volatile instance wrapping the given reference.
-    ///
-    /// This is equivalent to the `new` function with the difference that the returned
-    /// `Volatile` instance does not permit write operations. This is for example useful
-    /// with memory-mapped hardware registers that are defined as read-only by the hardware.
-    ///
-    /// ## Example
-    ///
-    /// Reading is allowed:
-    ///
-    /// ```rust
-    /// use volatile::Volatile;
-    ///
-    /// let value = 0u32;
-    ///
-    /// let volatile = Volatile::new_read_only(&value);
-    /// assert_eq!(volatile.read(), 0);
-    /// ```
-    ///
-    /// But writing is not:
-    ///
-    /// ```compile_fail
-    /// use volatile::Volatile;
-    ///
-    /// let mut value = 0u32;
-    ///
-    /// let mut volatile = Volatile::new_read_only(&mut value);
-    /// volatile.write(1);
-    /// //ERROR: ^^^^^ the trait `volatile::access::Writable` is not implemented
-    /// //             for `volatile::access::ReadOnly`
-    /// ```
-    pub const fn new_read_only(reference: R) -> Volatile<R, ReadOnly> {
-        Volatile {
-            reference,
-            access: PhantomData,
-        }
+    pub fn from_ref(reference: &T) -> Volatile<'_, T, ReadOnly> {
+        let raw = reference as *const T as *const UnsafeCell<T>;
+        unsafe { Volatile::new(&*raw, ReadOnly) }
     }
 
-    /// Constructs a new write-only volatile instance wrapping the given reference.
-    ///
-    /// This is equivalent to the `new` function with the difference that the returned
-    /// `Volatile` instance does not permit read operations. This is for example useful
-    /// with memory-mapped hardware registers that are defined as write-only by the hardware.
-    ///
-    /// ## Example
-    ///
-    /// Writing is allowed:
-    ///
-    /// ```rust
-    /// use volatile::Volatile;
-    ///
-    /// let mut value = 0u32;
-    ///
-    /// let mut volatile = Volatile::new_write_only(&mut value);
-    /// volatile.write(1);
-    /// ```
-    ///
-    /// But reading is not:
-    ///
-    /// ```compile_fail
-    /// use volatile::Volatile;
-    ///
-    /// let value = 0u32;
-    ///
-    /// let volatile = Volatile::new_write_only(&value);
-    /// volatile.read();
-    /// //ERROR: ^^^^ the trait `volatile::access::Readable` is not implemented
-    /// //            for `volatile::access::WriteOnly`
-    /// ```
-    pub const fn new_write_only(reference: R) -> Volatile<R, WriteOnly> {
-        Volatile {
-            reference,
-            access: PhantomData,
-        }
+    pub fn from_mut_ref(reference: &mut T) -> Volatile<'_, T> {
+        let raw = reference as *mut T as *mut UnsafeCell<T>;
+        unsafe { Volatile::new(&*raw, ReadWrite) }
+    }
+
+    pub unsafe fn from_ptr<'a>(reference: *const T) -> Volatile<'a, T, ReadOnly> {
+        let raw = reference as *const UnsafeCell<T>;
+        unsafe { Volatile::new(&*raw, ReadOnly) }
+    }
+
+    pub unsafe fn from_mut_ptr<'a>(reference: *mut T) -> Volatile<'a, T> {
+        let raw = reference as *mut UnsafeCell<T>;
+        unsafe { Volatile::new(&*raw, ReadWrite) }
     }
 }
 
 /// Methods for references to `Copy` types
-impl<R, T, A> Volatile<R, A>
+impl<'a, T, A> Volatile<'a, T, A>
 where
-    R: Deref<Target = T>,
-    T: Copy,
+    T: Copy + ?Sized,
 {
     /// Performs a volatile read of the contained value.
     ///
@@ -192,8 +137,8 @@ where
     where
         A: Readable,
     {
-        // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { ptr::read_volatile(&*self.reference) }
+        // UNSAFE: Safe, as ... TODO
+        unsafe { ptr::read_volatile(self.reference.get()) }
     }
 
     /// Performs a volatile write, setting the contained value to the given `value`.
@@ -216,10 +161,9 @@ where
     pub fn write(&mut self, value: T)
     where
         A: Writable,
-        R: DerefMut,
     {
-        // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { ptr::write_volatile(&mut *self.reference, value) };
+        // UNSAFE: Safe, as ... TODO
+        unsafe { ptr::write_volatile(self.reference.get(), value) };
     }
 
     /// Updates the contained value using the given closure and volatile instructions.
@@ -240,7 +184,6 @@ where
     pub fn update<F>(&mut self, f: F)
     where
         A: Readable + Writable,
-        R: DerefMut,
         F: FnOnce(&mut T),
     {
         let mut value = self.read();
@@ -250,7 +193,10 @@ where
 }
 
 /// Method for extracting the wrapped value.
-impl<R, A> Volatile<R, A> {
+impl<'a, T, A> Volatile<'a, T, A>
+where
+    T: ?Sized,
+{
     /// Extracts the inner value stored in the wrapper type.
     ///
     /// This method gives direct access to the wrapped reference and thus allows
@@ -275,15 +221,14 @@ impl<R, A> Volatile<R, A> {
     ///
     /// assert_eq!(*unwrapped, 50); // non volatile access, be careful!
     /// ```
-    pub fn extract_inner(self) -> R {
+    pub fn extract_inner(self) -> &'a UnsafeCell<T> {
         self.reference
     }
 }
 
 /// Transformation methods for accessing struct fields
-impl<R, T, A> Volatile<R, A>
+impl<T, A> Volatile<'_, T, A>
 where
-    R: Deref<Target = T>,
     T: ?Sized,
 {
     /// Constructs a new `Volatile` reference by mapping the wrapped value.
@@ -325,76 +270,32 @@ where
     ///    value
     /// });
     /// ```
-    pub fn map<'a, F, U>(&'a self, f: F) -> Volatile<&'a U, A>
+    pub fn map<F, U>(&self, f: F) -> Volatile<U, ReadOnly>
     where
-        F: FnOnce(&'a T) -> &'a U,
+        F: FnOnce(&UnsafeCell<T>) -> &UnsafeCell<U>,
         U: ?Sized,
-        T: 'a,
     {
         Volatile {
-            reference: f(self.reference.deref()),
-            access: self.access,
+            reference: f(&self.reference),
+            access: PhantomData,
         }
     }
 
-    /// Constructs a new mutable `Volatile` reference by mapping the wrapped value.
-    ///
-    /// This method is useful for accessing individual fields of volatile structs.
-    ///
-    /// Note that this method gives temporary access to the wrapped reference, which allows
-    /// accessing the value in a non-volatile way. This is normally not what you want, so
-    /// **this method should only be used for reference-to-reference transformations**.
-    ///
-    /// ## Examples
-    ///
-    /// Accessing a struct field:
-    ///
-    /// ```
-    /// use volatile::Volatile;
-    ///
-    /// struct Example { field_1: u32, field_2: u8, }
-    /// let mut value = Example { field_1: 15, field_2: 255 };
-    /// let mut volatile = Volatile::new(&mut value);
-    ///
-    /// // construct a volatile reference to a field
-    /// let mut field_2 = volatile.map_mut(|example| &mut example.field_2);
-    /// field_2.write(128);
-    /// assert_eq!(field_2.read(), 128);
-    /// ```
-    ///
-    /// Don't misuse this method to do a non-volatile read or write of the referenced value:
-    ///
-    /// ```
-    /// use volatile::Volatile;
-    ///
-    /// let mut value = 5;
-    /// let mut volatile = Volatile::new(&mut value);
-    ///
-    /// // DON'T DO THIS:
-    /// volatile.map_mut(|value| {
-    ///    *value = 10; // non-volatile write, might lead to bugs
-    ///    value
-    /// });
-    /// ```
-    pub fn map_mut<'a, F, U>(&'a mut self, f: F) -> Volatile<&'a mut U, A>
+    pub fn map_mut<F, U>(&mut self, f: F) -> Volatile<U, A>
     where
-        F: FnOnce(&mut T) -> &mut U,
-        R: DerefMut,
+        F: FnOnce(&UnsafeCell<T>) -> &UnsafeCell<U>,
         U: ?Sized,
-        T: 'a,
     {
         Volatile {
-            reference: f(&mut self.reference),
+            reference: f(&self.reference),
             access: self.access,
         }
     }
 }
 
 /// Methods for volatile slices
-impl<T, R, A> Volatile<R, A>
-where
-    R: Deref<Target = [T]>,
-{
+#[cfg(feature = "unstable")]
+impl<'a, T, A> Volatile<'a, [T], A> {
     /// Applies the index operation on the wrapped slice.
     ///
     /// Returns a shared `Volatile` reference to the resulting subslice.
@@ -427,55 +328,24 @@ where
     /// let subslice = volatile.index(1..);
     /// assert_eq!(subslice.index(0).read(), 2);
     /// ```
-    pub fn index<'a, I>(&'a self, index: I) -> Volatile<&'a I::Output, A>
+    pub fn index<I>(&self, index: I) -> Volatile<I::Output, ReadOnly>
     where
         I: SliceIndex<[T]>,
-        T: 'a,
     {
-        self.map(|slice| slice.index(index))
+        self.map(|slice| unsafe {
+            let element: *mut I::Output = slice.get().get_unchecked_mut(index);
+            &*(element as *mut UnsafeCell<I::Output>)
+        })
     }
 
-    /// Applies the mutable index operation on the wrapped slice.
-    ///
-    /// Returns a mutable `Volatile` reference to the resulting subslice.
-    ///
-    /// This is a convenience method for the `map_mut(|slice| slice.index_mut(index))`
-    /// operation, so it has the same behavior as the indexing operation on slice
-    /// (e.g. panic if index is out-of-bounds).
-    ///
-    /// ## Examples
-    ///
-    /// Accessing a single slice element:
-    ///
-    /// ```
-    /// use volatile::Volatile;
-    ///
-    /// let mut array = [1, 2, 3];
-    /// let slice = &mut array[..];
-    /// let mut volatile = Volatile::new(slice);
-    /// volatile.index_mut(1).write(6);
-    /// assert_eq!(volatile.index(1).read(), 6);
-    /// ```
-    ///
-    /// Accessing a subslice:
-    ///
-    /// ```
-    /// use volatile::Volatile;
-    ///
-    /// let mut array = [1, 2, 3];
-    /// let slice = &mut array[..];
-    /// let mut volatile = Volatile::new(slice);
-    /// let mut subslice = volatile.index_mut(1..);
-    /// subslice.index_mut(0).write(6);
-    /// assert_eq!(subslice.index(0).read(), 6);
-    /// ```
-    pub fn index_mut<'a, I>(&'a mut self, index: I) -> Volatile<&mut I::Output, A>
+    pub fn index_mut<I>(&mut self, index: I) -> Volatile<I::Output, A>
     where
         I: SliceIndex<[T]>,
-        R: DerefMut,
-        T: 'a,
     {
-        self.map_mut(|slice| slice.index_mut(index))
+        self.map_mut(|slice| unsafe {
+            let element: *mut I::Output = slice.get().get_unchecked_mut(index);
+            &*(element as *mut UnsafeCell<I::Output>)
+        })
     }
 
     /// Copies all elements from `self` into `dst`, using a volatile memcpy.
@@ -510,21 +380,21 @@ where
     /// assert_eq!(src, [1, 2]);
     /// assert_eq!(dst, [5, 1, 2]);
     /// ```
-    #[cfg(feature = "unstable")]
     pub fn copy_into_slice(&self, dst: &mut [T])
     where
         T: Copy,
     {
+        let len = self.reference.get().len();
         assert_eq!(
-            self.reference.len(),
+            len,
             dst.len(),
             "destination and source slices have different lengths"
         );
         unsafe {
             intrinsics::volatile_copy_nonoverlapping_memory(
                 dst.as_mut_ptr(),
-                self.reference.as_ptr(),
-                self.reference.len(),
+                self.reference.get().as_mut_ptr(),
+                len,
             );
         }
     }
@@ -564,22 +434,21 @@ where
     /// assert_eq!(src, [1, 2, 3, 4]);
     /// assert_eq!(dst, [3, 4]);
     /// ```
-    #[cfg(feature = "unstable")]
     pub fn copy_from_slice(&mut self, src: &[T])
     where
         T: Copy,
-        R: DerefMut,
     {
+        let len = self.reference.get().len();
         assert_eq!(
-            self.reference.len(),
+            len,
             src.len(),
             "destination and source slices have different lengths"
         );
         unsafe {
             intrinsics::volatile_copy_nonoverlapping_memory(
-                self.reference.as_mut_ptr(),
+                self.reference.get().as_mut_ptr(),
                 src.as_ptr(),
-                self.reference.len(),
+                len,
             );
         }
     }
@@ -611,44 +480,189 @@ where
     ///
     /// let mut byte_array = *b"Hello, World!";
     /// let mut slice: &mut [u8] = &mut byte_array[..];
-    /// let mut volatile = Volatile::new(slice);
+    /// let mut volatile = Volatile::from_mut_ref(slice);
     ///
     /// volatile.copy_within(1..5, 8);
     ///
     /// assert_eq!(&byte_array, b"Hello, Wello!");
-    #[cfg(feature = "unstable")]
     pub fn copy_within(&mut self, src: impl RangeBounds<usize>, dest: usize)
     where
         T: Copy,
-        R: DerefMut,
     {
+        let len = self.reference.get().len();
         // implementation taken from https://github.com/rust-lang/rust/blob/683d1bcd405727fcc9209f64845bd3b9104878b8/library/core/src/slice/mod.rs#L2726-L2738
         let Range {
             start: src_start,
             end: src_end,
-        } = range(src, ..self.reference.len());
+        } = range(src, ..len);
         let count = src_end - src_start;
-        assert!(
-            dest <= self.reference.len() - count,
-            "dest is out of bounds"
-        );
+        assert!(dest <= len - count, "dest is out of bounds");
         // SAFETY: the conditions for `volatile_copy_memory` have all been checked above,
         // as have those for `ptr::add`.
         unsafe {
             intrinsics::volatile_copy_memory(
-                self.reference.as_mut_ptr().add(dest),
-                self.reference.as_ptr().add(src_start),
+                self.reference.get().as_mut_ptr().add(dest),
+                self.reference.get().as_mut_ptr().add(src_start),
                 count,
             );
+        }
+    }
+
+    pub fn split_at(&self, mid: usize) -> (Volatile<[T], ReadOnly>, Volatile<[T], ReadOnly>) {
+        assert!(mid <= self.reference.get().len());
+        // SAFETY: `[ptr; mid]` and `[mid; len]` are inside `self`, which
+        // fulfills the requirements of `from_raw_parts_mut`.
+        unsafe { self.split_at_unchecked(mid) }
+    }
+
+    pub fn split_at_mut(&mut self, mid: usize) -> (Volatile<[T], A>, Volatile<[T], A>) {
+        assert!(mid <= self.reference.get().len());
+        // SAFETY: `[ptr; mid]` and `[mid; len]` are inside `self`, which
+        // fulfills the requirements of `from_raw_parts_mut`.
+        unsafe { self.split_at_mut_unchecked(mid) }
+    }
+
+    unsafe fn split_at_unchecked(
+        &self,
+        mid: usize,
+    ) -> (Volatile<[T], ReadOnly>, Volatile<[T], ReadOnly>) {
+        // SAFETY: Caller has to check that `0 <= mid <= self.len()`
+        unsafe {
+            (
+                Volatile {
+                    reference: {
+                        let raw: *const [T] =
+                            (self.reference.get() as *const [T]).get_unchecked(..mid);
+                        &*(raw as *const UnsafeCell<[T]>)
+                    },
+                    access: PhantomData,
+                },
+                Volatile {
+                    reference: {
+                        let raw: *const [T] =
+                            (self.reference.get() as *const [T]).get_unchecked(mid..);
+                        &*(raw as *const UnsafeCell<[T]>)
+                    },
+                    access: PhantomData,
+                },
+            )
+        }
+    }
+
+    unsafe fn split_at_mut_unchecked(
+        &mut self,
+        mid: usize,
+    ) -> (Volatile<[T], A>, Volatile<[T], A>) {
+        let len = self.reference.get().len();
+        let ptr = self.reference.get().as_mut_ptr();
+
+        // SAFETY: Caller has to check that `0 <= mid <= self.len()`.
+        //
+        // `[ptr; mid]` and `[mid; len]` are not overlapping, so returning a mutable reference
+        // is fine.
+        unsafe {
+            (
+                Volatile {
+                    reference: {
+                        let raw: *mut [T] = ptr::slice_from_raw_parts_mut(ptr, mid);
+                        &*(raw as *mut UnsafeCell<[T]>)
+                    },
+                    access: self.access,
+                },
+                Volatile {
+                    reference: {
+                        let raw: *mut [T] = ptr::slice_from_raw_parts_mut(ptr.add(mid), len - mid);
+                        &*(raw as *mut UnsafeCell<[T]>)
+                    },
+                    access: self.access,
+                },
+            )
+        }
+    }
+
+    pub fn as_chunks<const N: usize>(
+        &self,
+    ) -> (Volatile<[[T; N]], ReadOnly>, Volatile<[T], ReadOnly>) {
+        assert_ne!(N, 0);
+        let len = self.reference.get().len() / N;
+        let (multiple_of_n, remainder) = self.split_at(len * N);
+        // SAFETY: We already panicked for zero, and ensured by construction
+        // that the length of the subslice is a multiple of N.
+        let array_slice = unsafe { multiple_of_n.as_chunks_unchecked_by_val() };
+        (array_slice, remainder)
+    }
+
+    pub unsafe fn as_chunks_unchecked<const N: usize>(&self) -> Volatile<[[T; N]], ReadOnly> {
+        debug_assert_ne!(N, 0);
+        debug_assert_eq!(self.reference.get().len() % N, 0);
+        let new_len =
+            // SAFETY: Our precondition is exactly what's needed to call this
+            unsafe { crate::intrinsics::exact_div(self.reference.get().len(), N) };
+        // SAFETY: We cast a slice of `new_len * N` elements into
+        // a slice of `new_len` many `N` elements chunks.
+        let reference = unsafe {
+            let raw: *const [[T; N]] =
+                ptr::slice_from_raw_parts(self.reference.get().as_mut_ptr().cast(), new_len);
+            &*(raw as *const UnsafeCell<[[T; N]]>)
+        };
+        Volatile {
+            reference,
+            access: PhantomData,
+        }
+    }
+
+    pub fn as_chunks_mut<const N: usize>(&mut self) -> (Volatile<[[T; N]], A>, Volatile<[T], A>) {
+        assert_ne!(N, 0);
+        let len = self.reference.get().len() / N;
+        let (multiple_of_n, remainder) = self.split_at_mut(len * N);
+        // SAFETY: We already panicked for zero, and ensured by construction
+        // that the length of the subslice is a multiple of N.
+        let array_slice = unsafe { multiple_of_n.as_chunks_unchecked_by_val() };
+        (array_slice, remainder)
+    }
+
+    pub unsafe fn as_chunks_unchecked_mut<const N: usize>(&mut self) -> Volatile<[[T; N]], A> {
+        debug_assert_ne!(N, 0);
+        debug_assert_eq!(self.reference.get().len() % N, 0);
+        let new_len =
+            // SAFETY: Our precondition is exactly what's needed to call this
+            unsafe { crate::intrinsics::exact_div(self.reference.get().len(), N) };
+        // SAFETY: We cast a slice of `new_len * N` elements into
+        // a slice of `new_len` many `N` elements chunks.
+        let reference = unsafe {
+            let raw: *mut [[T; N]] =
+                ptr::slice_from_raw_parts_mut(self.reference.get().as_mut_ptr().cast(), new_len);
+            &*(raw as *mut UnsafeCell<[[T; N]]>)
+        };
+        Volatile {
+            reference,
+            access: self.access,
+        }
+    }
+
+    pub unsafe fn as_chunks_unchecked_by_val<const N: usize>(self) -> Volatile<'a, [[T; N]], A> {
+        debug_assert_ne!(N, 0);
+        debug_assert_eq!(self.reference.get().len() % N, 0);
+        let new_len =
+            // SAFETY: Our precondition is exactly what's needed to call this
+            unsafe { crate::intrinsics::exact_div(self.reference.get().len(), N) };
+        // SAFETY: We cast a slice of `new_len * N` elements into
+        // a slice of `new_len` many `N` elements chunks.
+        let reference = unsafe {
+            let raw: *mut [[T; N]] =
+                ptr::slice_from_raw_parts_mut(self.reference.get().as_mut_ptr().cast(), new_len);
+            &*(raw as *mut UnsafeCell<[[T; N]]>)
+        };
+        Volatile {
+            reference,
+            access: self.access,
         }
     }
 }
 
 /// Methods for volatile byte slices
-impl<R, A> Volatile<R, A>
-where
-    R: Deref<Target = [u8]>,
-{
+#[cfg(feature = "unstable")]
+impl<A> Volatile<'_, [u8], A> {
     /// Sets all elements of the byte slice to the given `value` using a volatile `memset`.
     ///
     /// This method is similar to the `slice::fill` method of the standard library, with the
@@ -668,16 +682,12 @@ where
     /// buf.fill(1);
     /// assert_eq!(buf.extract_inner(), vec![1; 10]);
     /// ```
-    #[cfg(feature = "unstable")]
-    pub fn fill(&mut self, value: u8)
-    where
-        R: DerefMut,
-    {
+    pub fn fill(&mut self, value: u8) {
         unsafe {
             intrinsics::volatile_set_memory(
-                self.reference.as_mut_ptr(),
+                self.reference.get().as_mut_ptr(),
                 value,
-                self.reference.len(),
+                self.reference.get().len(),
             );
         }
     }
@@ -688,10 +698,7 @@ where
 /// These methods are only available with the `unstable` feature enabled (requires a nightly
 /// Rust compiler).
 #[cfg(feature = "unstable")]
-impl<R, A, T, const N: usize> Volatile<R, A>
-where
-    R: Deref<Target = [T; N]>,
-{
+impl<T, A, const N: usize> Volatile<'_, [T; N], A> {
     /// Converts an array reference to a shared slice.
     ///
     /// This makes it possible to use the methods defined on slices.
@@ -714,42 +721,19 @@ where
     ///
     /// assert_eq!(dst, [1, 2]);
     /// ```
-    pub fn as_slice(&self) -> Volatile<&[T], A> {
-        self.map(|array| &array[..])
-    }
-
-    /// Converts a mutable array reference to a mutable slice.
-    ///
-    /// This makes it possible to use the methods defined on slices.
-    ///
-    /// ## Example
-    ///
-    /// Copying two elements from a slice into a mutable array reference:
-    ///
-    /// ```
-    /// use volatile::Volatile;
-    ///
-    /// let src = [1, 2, 3, 4];
-    /// let mut dst = [0, 0];
-    /// let mut volatile = Volatile::new(&mut dst);
-    ///
-    /// // convert the `Volatile<&mut [i32; 2]>` array reference to a `Volatile<&mut [i32]>` slice
-    /// let mut volatile_slice = volatile.as_mut_slice();
-    /// // we can now use the slice methods
-    /// volatile_slice.copy_from_slice(&src[2..]);
-    ///
-    /// assert_eq!(dst, [3, 4]);
-    /// ```
-    pub fn as_mut_slice(&mut self) -> Volatile<&mut [T], A>
-    where
-        R: DerefMut,
-    {
-        self.map_mut(|array| &mut array[..])
+    pub fn as_slice(&self) -> Volatile<[T], ReadOnly> {
+        self.map(|array| {
+            let slice: *mut [T] = ptr::slice_from_raw_parts_mut(array.get() as *mut T, N);
+            unsafe { &*(slice as *const UnsafeCell<[T]>) }
+        })
     }
 }
 
 /// Methods for restricting access.
-impl<R> Volatile<R> {
+impl<'a, T> Volatile<'a, T>
+where
+    T: ?Sized,
+{
     /// Restricts access permissions to read-only.
     ///
     /// ## Example
@@ -764,7 +748,7 @@ impl<R> Volatile<R> {
     /// assert_eq!(read_only.read(), -4);
     /// // read_only.write(10); // compile-time error
     /// ```
-    pub fn read_only(self) -> Volatile<R, ReadOnly> {
+    pub fn read_only(self) -> Volatile<'a, T, ReadOnly> {
         Volatile {
             reference: self.reference,
             access: PhantomData,
@@ -789,7 +773,7 @@ impl<R> Volatile<R> {
     /// field_2.write(14);
     /// // field_2.read(); // compile-time error
     /// ```
-    pub fn write_only(self) -> Volatile<R, WriteOnly> {
+    pub fn write_only(self) -> Volatile<'a, T, WriteOnly> {
         Volatile {
             reference: self.reference,
             access: PhantomData,
@@ -797,10 +781,9 @@ impl<R> Volatile<R> {
     }
 }
 
-impl<R, T, A> fmt::Debug for Volatile<R, A>
+impl<T, A> fmt::Debug for Volatile<'_, T, A>
 where
-    R: Deref<Target = T>,
-    T: Copy + fmt::Debug,
+    T: Copy + fmt::Debug + ?Sized,
     A: Readable,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -808,9 +791,9 @@ where
     }
 }
 
-impl<R> fmt::Debug for Volatile<R, WriteOnly>
+impl<T> fmt::Debug for Volatile<'_, T, WriteOnly>
 where
-    R: Deref,
+    T: ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Volatile").field(&"[write-only]").finish()
@@ -820,17 +803,18 @@ where
 #[cfg(test)]
 mod tests {
     use super::Volatile;
+    use core::cell::UnsafeCell;
 
     #[test]
     fn test_read() {
         let val = 42;
-        assert_eq!(Volatile::new(&val).read(), 42);
+        assert_eq!(Volatile::from_ref(&val).read(), 42);
     }
 
     #[test]
     fn test_write() {
         let mut val = 50;
-        let mut volatile = Volatile::new(&mut val);
+        let mut volatile = Volatile::from_mut_ref(&mut val);
         volatile.write(50);
         assert_eq!(val, 50);
     }
@@ -838,21 +822,14 @@ mod tests {
     #[test]
     fn test_update() {
         let mut val = 42;
-        let mut volatile = Volatile::new(&mut val);
+        let mut volatile = Volatile::from_mut_ref(&mut val);
         volatile.update(|v| *v += 1);
         assert_eq!(val, 43);
     }
 
     #[test]
-    fn test_slice() {
-        let mut val = [1, 2, 3];
-        let mut volatile = Volatile::new(&mut val[..]);
-        volatile.index_mut(0).update(|v| *v += 1);
-        assert_eq!(val, [2, 2, 3]);
-    }
-
-    #[test]
     fn test_struct() {
+        #[derive(Debug, PartialEq)]
         struct S {
             field_1: u32,
             field_2: bool,
@@ -862,21 +839,43 @@ mod tests {
             field_1: 60,
             field_2: true,
         };
-        let mut volatile = Volatile::new(&mut val);
-        volatile.map_mut(|s| &mut s.field_1).update(|v| *v += 1);
-        let mut field_2 = volatile.map_mut(|s| &mut s.field_2);
+        let mut volatile = Volatile::from_mut_ref(&mut val);
+        volatile
+            .map_mut(|s| unsafe {
+                let ptr = core::ptr::addr_of_mut!((*s.get()).field_1);
+                &*(ptr as *mut UnsafeCell<u32>)
+            })
+            .update(|v| *v += 1);
+        let mut field_2 = volatile.map_mut(|s| unsafe {
+            let ptr = core::ptr::addr_of_mut!((*s.get()).field_2);
+            &*(ptr as *mut UnsafeCell<bool>)
+        });
         assert!(field_2.read());
         field_2.write(false);
-        assert_eq!(volatile.map(|s| &s.field_1).read(), 61);
-        assert_eq!(volatile.map(|s| &s.field_2).read(), false);
+        assert_eq!(
+            val,
+            S {
+                field_1: 61,
+                field_2: false
+            }
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn test_slice() {
+        let mut val: &mut [u32] = &mut [1, 2, 3];
+        let mut volatile = Volatile::from_mut_ref(val);
+        volatile.index_mut(0).update(|v| *v += 1);
+        assert_eq!(val, [2, 2, 3]);
     }
 
     #[cfg(feature = "unstable")]
     #[test]
     fn test_chunks() {
-        let mut val = [1, 2, 3, 4, 5, 6];
-        let mut volatile = Volatile::new(&mut val[..]);
-        let mut chunks = volatile.map_mut(|s| s.as_chunks_mut().0);
+        let mut val: &mut [u32] = &mut [1, 2, 3, 4, 5, 6];
+        let mut volatile = Volatile::from_mut_ref(val);
+        let mut chunks = volatile.as_chunks_mut().0;
         chunks.index_mut(1).write([10, 11, 12]);
         assert_eq!(chunks.index(0).read(), [1, 2, 3]);
         assert_eq!(chunks.index(1).read(), [10, 11, 12]);
