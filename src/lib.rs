@@ -16,7 +16,9 @@
 #![warn(missing_docs)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
-use access::{ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
+use access::{
+    ReadOnly, ReadWrite, Readable, UnsafelyReadable, UnsafelyWritable, Writable, WriteOnly,
+};
 use core::{fmt, marker::PhantomData, ptr};
 #[cfg(feature = "unstable")]
 use core::{
@@ -177,6 +179,30 @@ where
         let mut value = self.read();
         f(&mut value);
         self.write(value);
+    }
+
+    pub unsafe fn read_unsafe(&self) -> T
+    where
+        A: UnsafelyReadable,
+    {
+        unsafe { ptr::read_volatile(self.pointer) }
+    }
+
+    pub unsafe fn write_unsafe(&mut self, value: T)
+    where
+        A: UnsafelyWritable,
+    {
+        unsafe { ptr::write_volatile(self.pointer, value) };
+    }
+
+    pub unsafe fn update_unsafe<F>(&mut self, f: F)
+    where
+        A: UnsafelyReadable + UnsafelyWritable,
+        F: FnOnce(&mut T),
+    {
+        let mut value = unsafe { self.read_unsafe() };
+        f(&mut value);
+        unsafe { self.write_unsafe(value) };
     }
 }
 
@@ -765,7 +791,7 @@ macro_rules! map_field_mut {
 
 #[cfg(test)]
 mod tests {
-    use super::Volatile;
+    use super::{access::*, Volatile};
     use core::cell::UnsafeCell;
 
     #[test]
@@ -788,6 +814,92 @@ mod tests {
         let mut volatile = unsafe { Volatile::from_mut_ptr(&mut val) };
         volatile.update(|v| *v += 1);
         assert_eq!(val, 43);
+    }
+
+    #[test]
+    fn test_access() {
+        let mut val: i64 = 42;
+
+        // ReadWrite
+        assert_eq!(unsafe { Volatile::new(&mut val, ReadWrite) }.read(), 42);
+        unsafe { Volatile::new(&mut val, ReadWrite) }.write(50);
+        assert_eq!(val, 50);
+        unsafe { Volatile::new(&mut val, ReadWrite) }.update(|i| *i += 1);
+        assert_eq!(val, 51);
+
+        // ReadOnly and WriteOnly
+        assert_eq!(unsafe { Volatile::new(&mut val, ReadOnly) }.read(), 51);
+        unsafe { Volatile::new(&mut val, WriteOnly) }.write(12);
+        assert_eq!(val, 12);
+
+        // Custom: safe read + safe write
+        {
+            let access = Custom {
+                read: SafeAccess,
+                write: SafeAccess,
+            };
+            let mut volatile = unsafe { Volatile::new(&mut val, access) };
+            let random: i32 = rand::random();
+            volatile.write(i64::from(random));
+            assert_eq!(volatile.read(), i64::from(random));
+            let random2: i32 = rand::random();
+            volatile.update(|i| *i += i64::from(random2));
+            assert_eq!(volatile.read(), i64::from(random) + i64::from(random2));
+        }
+
+        // Custom: safe read + unsafe write
+        {
+            let access = Custom {
+                read: SafeAccess,
+                write: UnsafeAccess,
+            };
+            let mut volatile = unsafe { Volatile::new(&mut val, access) };
+            let random: i32 = rand::random();
+            unsafe { volatile.write_unsafe(i64::from(random)) };
+            assert_eq!(volatile.read(), i64::from(random));
+            let random2: i32 = rand::random();
+            unsafe { volatile.update_unsafe(|i| *i += i64::from(random2)) };
+            assert_eq!(volatile.read(), i64::from(random) + i64::from(random2));
+        }
+
+        // Custom: safe read + no write
+        {
+            let access = Custom {
+                read: SafeAccess,
+                write: NoAccess,
+            };
+            let random = rand::random();
+            val = random;
+            let mut volatile = unsafe { Volatile::new(&mut val, access) };
+            assert_eq!(volatile.read(), i64::from(random));
+        }
+
+        // Custom: unsafe read + safe write
+        {
+            let access = Custom {
+                read: UnsafeAccess,
+                write: SafeAccess,
+            };
+            let mut volatile = unsafe { Volatile::new(&mut val, access) };
+            let random: i32 = rand::random();
+            volatile.write(i64::from(random));
+            assert_eq!(unsafe { volatile.read_unsafe() }, i64::from(random));
+            let random2: i32 = rand::random();
+            volatile.update_unsafe(|i| *i += i64::from(random2));
+            assert_eq!(
+                volatile.read_unsafe(),
+                i64::from(random) + i64::from(random2)
+            );
+        }
+
+        // Todo: Custom: unsafe read + unsafe write
+        // Todo: Custom: unsafe read + no write
+        // Todo: Custom: no read + safe write
+        // Todo: Custom: no read + unsafe write
+        // Todo: Custom: no read + no write
+
+        // Todo: is there a way to check that a compile error occurs when trying to use
+        // unavailable methods (e.g. `write` when write permission is `UnsafeAccess`)?
     }
 
     #[test]
