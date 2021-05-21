@@ -1,4 +1,3 @@
-
 pub trait Access {}
 
 /// Helper trait that is implemented by [`ReadWrite`] and [`ReadOnly`].
