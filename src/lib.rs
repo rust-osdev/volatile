@@ -7,7 +7,6 @@
 
 #![no_std]
 #![cfg_attr(feature = "unstable", feature(core_intrinsics))]
-#![cfg_attr(feature = "unstable", feature(const_generics))]
 #![cfg_attr(feature = "unstable", feature(slice_range))]
 #![cfg_attr(feature = "unstable", feature(slice_ptr_get))]
 #![cfg_attr(feature = "unstable", feature(slice_ptr_len))]
