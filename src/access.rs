@@ -28,14 +28,14 @@ impl Access<SafeAccess, NoAccess> {
         }
     }
 
-    pub fn write_only() -> WriteOnly {
+    pub const fn write_only() -> WriteOnly {
         Access {
             read: NoAccess,
             write: SafeAccess,
         }
     }
 
-    pub fn read_write() -> ReadWrite {
+    pub const fn read_write() -> ReadWrite {
         Access {
             read: SafeAccess,
             write: SafeAccess,
