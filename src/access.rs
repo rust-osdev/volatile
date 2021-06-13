@@ -1,56 +1,48 @@
-pub trait Access {}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct NoAccess;
 
-/// Helper trait that is implemented by [`ReadWrite`] and [`ReadOnly`].
-pub trait Readable: UnsafelyReadable {}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct UnsafeAccess;
 
-/// Helper trait that is implemented by [`ReadWrite`] and [`WriteOnly`].
-pub trait Writable: UnsafelyWritable {}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct SafeAccess;
 
-pub trait UnsafelyReadable {}
+pub trait Unsafe {}
+pub trait Safe: Unsafe {}
 
-pub trait UnsafelyWritable {}
+impl Unsafe for UnsafeAccess {}
+impl Unsafe for SafeAccess {}
+impl Safe for SafeAccess {}
 
-/// Zero-sized marker type for allowing both read and write access.
-#[derive(Debug, Copy, Clone)]
-pub struct ReadWrite;
-impl Access for ReadWrite {}
-impl Readable for ReadWrite {}
-impl UnsafelyReadable for ReadWrite {}
-impl Writable for ReadWrite {}
-impl UnsafelyWritable for ReadWrite {}
-
-/// Zero-sized marker type for allowing only read access.
-#[derive(Debug, Copy, Clone)]
-pub struct ReadOnly;
-
-impl Access for ReadOnly {}
-impl Readable for ReadOnly {}
-impl UnsafelyReadable for ReadOnly {}
-
-/// Zero-sized marker type for allowing only write access.
-#[derive(Debug, Copy, Clone)]
-pub struct WriteOnly;
-
-impl Access for WriteOnly {}
-impl Writable for WriteOnly {}
-impl UnsafelyWritable for WriteOnly {}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct Custom<R, W> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Access<R, W> {
     pub read: R,
     pub write: W,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct NoAccess;
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct SafeAccess;
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct UnsafeAccess;
+impl Access<SafeAccess, NoAccess> {
+    pub const fn read_only() -> ReadOnly {
+        Access {
+            read: SafeAccess,
+            write: NoAccess,
+        }
+    }
 
-impl<W> Readable for Custom<SafeAccess, W> {}
-impl<W> UnsafelyReadable for Custom<SafeAccess, W> {}
-impl<W> UnsafelyReadable for Custom<UnsafeAccess, W> {}
-impl<R> Writable for Custom<R, SafeAccess> {}
-impl<R> UnsafelyWritable for Custom<R, SafeAccess> {}
-impl<R> UnsafelyWritable for Custom<R, UnsafeAccess> {}
+    pub fn write_only() -> WriteOnly {
+        Access {
+            read: NoAccess,
+            write: SafeAccess,
+        }
+    }
+
+    pub fn read_write() -> ReadWrite {
+        Access {
+            read: SafeAccess,
+            write: SafeAccess,
+        }
+    }
+}
+
+pub type ReadOnly = Access<SafeAccess, NoAccess>;
+pub type WriteOnly = Access<NoAccess, SafeAccess>;
+pub type ReadWrite = Access<SafeAccess, SafeAccess>;
