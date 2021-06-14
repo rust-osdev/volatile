@@ -196,6 +196,50 @@ fn test_slice() {
 
 #[cfg(feature = "unstable")]
 #[test]
+#[should_panic]
+fn test_bounds_check_1() {
+    let val: &mut [u32] = &mut [1, 2, 3];
+    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
+    volatile.index_mut(3);
+}
+
+#[cfg(feature = "unstable")]
+#[test]
+#[should_panic]
+fn test_bounds_check_2() {
+    let val: &mut [u32] = &mut [1, 2, 3];
+    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
+    volatile.index_mut(2..1);
+}
+
+#[cfg(feature = "unstable")]
+#[test]
+#[should_panic]
+fn test_bounds_check_3() {
+    let val: &mut [u32] = &mut [1, 2, 3];
+    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
+    volatile.index_mut(4..); // `3..` is is still ok (see next test)
+}
+
+#[cfg(feature = "unstable")]
+#[test]
+fn test_bounds_check_4() {
+    let val: &mut [u32] = &mut [1, 2, 3];
+    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
+    assert_eq!(volatile.index_mut(3..).len(), 0);
+}
+
+#[cfg(feature = "unstable")]
+#[test]
+#[should_panic]
+fn test_bounds_check_5() {
+    let val: &mut [u32] = &mut [1, 2, 3];
+    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
+    volatile.index_mut(..4);
+}
+
+#[cfg(feature = "unstable")]
+#[test]
 fn test_chunks() {
     let val: &mut [u32] = &mut [1, 2, 3, 4, 5, 6];
     let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };

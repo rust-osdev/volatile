@@ -365,6 +365,10 @@ where
 /// Methods for volatile slices
 #[cfg(feature = "unstable")]
 impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
+    pub fn len(&self) -> usize {
+        self.pointer.len()
+    }
+
     /// Applies the index operation on the wrapped slice.
     ///
     /// Returns a shared `Volatile` reference to the resulting subslice.
@@ -401,17 +405,27 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     /// let subslice = volatile.index(1..);
     /// assert_eq!(subslice.index(0).read(), 2);
     /// ```
-    pub fn index<I>(&self, index: I) -> VolatilePtr<I::Output, Access<R, access::NoAccess>>
+    pub fn index<I>(
+        &self,
+        index: I,
+    ) -> VolatilePtr<<I as SliceIndex<[T]>>::Output, Access<R, access::NoAccess>>
     where
-        I: SliceIndex<[T]>,
+        I: SliceIndex<[T]> + SliceIndex<[()]> + Clone,
     {
+        bounds_check(self.pointer.len(), index.clone());
+
         unsafe { self.map(|slice| slice.get_unchecked_mut(index)) }
     }
 
-    pub fn index_mut<I>(&mut self, index: I) -> VolatilePtr<I::Output, Access<R, W>>
+    pub fn index_mut<I>(
+        &mut self,
+        index: I,
+    ) -> VolatilePtr<<I as SliceIndex<[T]>>::Output, Access<R, W>>
     where
-        I: SliceIndex<[T]>,
+        I: SliceIndex<[T]> + SliceIndex<[()]> + Clone,
     {
+        bounds_check(self.pointer.len(), index.clone());
+
         unsafe { self.map_mut(|slice| slice.get_unchecked_mut(index)) }
     }
 
@@ -912,4 +926,12 @@ where
             .field(&"[no read access]")
             .finish()
     }
+}
+
+#[cfg(feature = "unstable")]
+fn bounds_check(len: usize, index: impl SliceIndex<[()]>) {
+    const MAX_ARRAY: [(); usize::MAX] = [(); usize::MAX];
+
+    let bound_check_slice = &MAX_ARRAY[..len];
+    &bound_check_slice[index];
 }
