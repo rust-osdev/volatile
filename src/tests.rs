@@ -1,12 +1,12 @@
 use core::ptr::NonNull;
 
-use super::{access::*, Volatile};
+use super::{access::*, VolatilePtr};
 
 #[test]
 fn test_read() {
     let val = 42;
     assert_eq!(
-        unsafe { Volatile::new_read_only(NonNull::from(&val)) }.read(),
+        unsafe { VolatilePtr::new_read_only(NonNull::from(&val)) }.read(),
         42
     );
 }
@@ -14,7 +14,7 @@ fn test_read() {
 #[test]
 fn test_write() {
     let mut val = 50;
-    let mut volatile = unsafe { Volatile::new_read_write(NonNull::from(&mut val)) };
+    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut val)) };
     volatile.write(50);
     assert_eq!(val, 50);
 }
@@ -22,7 +22,7 @@ fn test_write() {
 #[test]
 fn test_update() {
     let mut val = 42;
-    let mut volatile = unsafe { Volatile::new_read_write(NonNull::from(&mut val)) };
+    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut val)) };
     volatile.update(|v| *v += 1);
     assert_eq!(val, 43);
 }
@@ -33,21 +33,25 @@ fn test_access() {
 
     // ReadWrite
     assert_eq!(
-        unsafe { Volatile::new_with_access(NonNull::from(&mut val), Access::read_write()) }.read(),
+        unsafe { VolatilePtr::new_with_access(NonNull::from(&mut val), Access::read_write()) }
+            .read(),
         42
     );
-    unsafe { Volatile::new_with_access(NonNull::from(&mut val), Access::read_write()) }.write(50);
+    unsafe { VolatilePtr::new_with_access(NonNull::from(&mut val), Access::read_write()) }
+        .write(50);
     assert_eq!(val, 50);
-    unsafe { Volatile::new_with_access(NonNull::from(&mut val), Access::read_write()) }
+    unsafe { VolatilePtr::new_with_access(NonNull::from(&mut val), Access::read_write()) }
         .update(|i| *i += 1);
     assert_eq!(val, 51);
 
     // ReadOnly and WriteOnly
     assert_eq!(
-        unsafe { Volatile::new_with_access(NonNull::from(&mut val), Access::read_only()) }.read(),
+        unsafe { VolatilePtr::new_with_access(NonNull::from(&mut val), Access::read_only()) }
+            .read(),
         51
     );
-    unsafe { Volatile::new_with_access(NonNull::from(&mut val), Access::write_only()) }.write(12);
+    unsafe { VolatilePtr::new_with_access(NonNull::from(&mut val), Access::write_only()) }
+        .write(12);
     assert_eq!(val, 12);
 
     // Custom: safe read + safe write
@@ -56,7 +60,7 @@ fn test_access() {
             read: SafeAccess,
             write: SafeAccess,
         };
-        let mut volatile = unsafe { Volatile::new_with_access(NonNull::from(&mut val), access) };
+        let mut volatile = unsafe { VolatilePtr::new_with_access(NonNull::from(&mut val), access) };
         let random: i32 = rand::random();
         volatile.write(i64::from(random));
         assert_eq!(volatile.read(), i64::from(random));
@@ -71,7 +75,7 @@ fn test_access() {
             read: SafeAccess,
             write: UnsafeAccess,
         };
-        let mut volatile = unsafe { Volatile::new_with_access(NonNull::from(&mut val), access) };
+        let mut volatile = unsafe { VolatilePtr::new_with_access(NonNull::from(&mut val), access) };
         let random: i32 = rand::random();
         unsafe { volatile.write_unsafe(i64::from(random)) };
         assert_eq!(volatile.read(), i64::from(random));
@@ -88,7 +92,7 @@ fn test_access() {
         };
         let random = rand::random();
         val = random;
-        let mut volatile = unsafe { Volatile::new_with_access(NonNull::from(&mut val), access) };
+        let volatile = unsafe { VolatilePtr::new_with_access(NonNull::from(&mut val), access) };
         assert_eq!(volatile.read(), i64::from(random));
     }
 
@@ -98,7 +102,7 @@ fn test_access() {
             read: UnsafeAccess,
             write: SafeAccess,
         };
-        let mut volatile = unsafe { Volatile::new_with_access(NonNull::from(&mut val), access) };
+        let mut volatile = unsafe { VolatilePtr::new_with_access(NonNull::from(&mut val), access) };
         let random: i32 = rand::random();
         volatile.write(i64::from(random));
         assert_eq!(unsafe { volatile.read_unsafe() }, i64::from(random));
@@ -132,7 +136,7 @@ fn test_struct() {
         field_1: 60,
         field_2: true,
     };
-    let mut volatile = unsafe { Volatile::new_read_write(NonNull::from(&mut val)) };
+    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut val)) };
     unsafe {
         volatile.map_mut(|s| NonNull::new(core::ptr::addr_of_mut!((*s.as_ptr()).field_1)).unwrap())
     }
@@ -163,7 +167,7 @@ fn test_struct_macro() {
         field_1: 60,
         field_2: true,
     };
-    let mut volatile = unsafe { Volatile::new_read_write(NonNull::from(&mut val)) };
+    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut val)) };
     let mut field_1 = map_field_mut!(volatile.field_1);
     field_1.update(|v| *v += 1);
     let mut field_2 = map_field_mut!(volatile.field_2);
@@ -182,7 +186,7 @@ fn test_struct_macro() {
 #[test]
 fn test_slice() {
     let val: &mut [u32] = &mut [1, 2, 3];
-    let mut volatile = unsafe { Volatile::new_read_write(NonNull::from(val)) };
+    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
     volatile.index_mut(0).update(|v| *v += 1);
 
     let mut dst = [0; 3];
@@ -193,10 +197,18 @@ fn test_slice() {
 #[cfg(feature = "unstable")]
 #[test]
 fn test_chunks() {
-    let mut val: &mut [u32] = &mut [1, 2, 3, 4, 5, 6];
-    let mut volatile = unsafe { Volatile::new_read_write(NonNull::from(val)) };
+    let val: &mut [u32] = &mut [1, 2, 3, 4, 5, 6];
+    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
     let mut chunks = volatile.as_chunks_mut().0;
     chunks.index_mut(1).write([10, 11, 12]);
     assert_eq!(chunks.index(0).read(), [1, 2, 3]);
     assert_eq!(chunks.index(1).read(), [10, 11, 12]);
+}
+
+#[test]
+fn test_lifetime() {
+    let mut val = 50;
+    let mut volatile = VolatilePtr::from_mut_ref(&mut val);
+    volatile.write(50);
+    assert_eq!(val, 50);
 }
