@@ -10,7 +10,13 @@
 #![cfg_attr(feature = "unstable", feature(slice_range))]
 #![cfg_attr(feature = "unstable", feature(slice_ptr_get))]
 #![cfg_attr(feature = "unstable", feature(slice_ptr_len))]
-#![cfg_attr(feature = "unstable", allow(incomplete_features))]
+#![cfg_attr(feature = "very_unstable", feature(const_slice_ptr_len))]
+#![cfg_attr(feature = "very_unstable", feature(const_panic))]
+#![cfg_attr(feature = "very_unstable", feature(const_fn_trait_bound))]
+#![cfg_attr(feature = "very_unstable", feature(const_fn_fn_ptr_basics))]
+#![cfg_attr(feature = "very_unstable", feature(const_trait_impl))]
+#![cfg_attr(feature = "very_unstable", feature(const_mut_refs))]
+#![cfg_attr(feature = "very_unstable", allow(incomplete_features))]
 #![cfg_attr(all(feature = "unstable", test), feature(slice_as_chunks))]
 #![warn(missing_docs)]
 #![deny(unsafe_op_in_unsafe_fn)]
@@ -353,7 +359,28 @@ where
         unsafe { VolatilePtr::new_generic(f(self.pointer)) }
     }
 
+    #[cfg(feature = "very_unstable")]
+    pub const unsafe fn map_const<'a, F, U>(
+        &'a self,
+        f: F,
+    ) -> VolatilePtr<'a, U, Access<R, access::NoAccess>>
+    where
+        F: FnOnce(NonNull<T>) -> NonNull<U>,
+        U: ?Sized,
+    {
+        unsafe { VolatilePtr::new_generic(f(self.pointer)) }
+    }
+
     pub unsafe fn map_mut<F, U>(&mut self, f: F) -> VolatilePtr<U, Access<R, W>>
+    where
+        F: FnOnce(NonNull<T>) -> NonNull<U>,
+        U: ?Sized,
+    {
+        unsafe { VolatilePtr::new_generic(f(self.pointer)) }
+    }
+
+    #[cfg(feature = "very_unstable")]
+    pub const unsafe fn map_mut_const<F, U>(&mut self, f: F) -> VolatilePtr<U, Access<R, W>>
     where
         F: FnOnce(NonNull<T>) -> NonNull<U>,
         U: ?Sized,
@@ -417,6 +444,16 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
         unsafe { self.map(|slice| slice.get_unchecked_mut(index)) }
     }
 
+    #[cfg(feature = "very_unstable")]
+    pub const fn index_const(&self, index: usize) -> VolatilePtr<T, Access<R, access::NoAccess>> {
+        assert!(index < self.pointer.len(), "index out of bounds");
+        unsafe {
+            self.map_const(|slice| {
+                NonNull::new_unchecked(slice.as_non_null_ptr().as_ptr().add(index))
+            })
+        }
+    }
+
     pub fn index_mut<I>(
         &mut self,
         index: I,
@@ -427,6 +464,16 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
         bounds_check(self.pointer.len(), index.clone());
 
         unsafe { self.map_mut(|slice| slice.get_unchecked_mut(index)) }
+    }
+
+    #[cfg(feature = "very_unstable")]
+    pub const fn index_mut_const(&mut self, index: usize) -> VolatilePtr<T, Access<R, W>> {
+        assert!(index < self.pointer.len(), "index out of bounds");
+        unsafe {
+            self.map_mut_const(|slice| {
+                NonNull::new_unchecked(slice.as_non_null_ptr().as_ptr().add(index))
+            })
+        }
     }
 
     /// Copies all elements from `self` into `dst`, using a volatile memcpy.
