@@ -7,7 +7,6 @@
 
 #![no_std]
 #![cfg_attr(feature = "unstable", feature(core_intrinsics))]
-#![cfg_attr(feature = "unstable", feature(const_generics))]
 #![cfg_attr(feature = "unstable", feature(slice_range))]
 #![cfg_attr(feature = "unstable", allow(incomplete_features))]
 #![cfg_attr(all(feature = "unstable", test), feature(slice_as_chunks))]
@@ -684,10 +683,6 @@ where
 }
 
 /// Methods for converting arrays to slices
-///
-/// These methods are only available with the `unstable` feature enabled (requires a nightly
-/// Rust compiler).
-#[cfg(feature = "unstable")]
 impl<R, A, T, const N: usize> Volatile<R, A>
 where
     R: Deref<Target = [T; N]>,
@@ -698,21 +693,21 @@ where
     ///
     /// ## Example
     ///
-    /// Copying two elements from a volatile array reference using `copy_into_slice`:
+    /// Reading a subslice from a volatile array reference using `index`:
     ///
     /// ```
     /// use volatile::Volatile;
     ///
-    /// let src = [1, 2];
+    /// let src = [1, 2, 3, 4];
     /// let volatile = Volatile::new(&src);
-    /// let mut dst = [0, 0];
     ///
-    /// // convert the `Volatile<&[i32; 2]>` array reference to a `Volatile<&[i32]>` slice
+    /// // convert the `Volatile<&[i32; 4]>` array reference to a `Volatile<&[i32]>` slice
     /// let volatile_slice = volatile.as_slice();
     /// // we can now use the slice methods
-    /// volatile_slice.copy_into_slice(&mut dst);
+    /// let subslice = volatile_slice.index(2..);
     ///
-    /// assert_eq!(dst, [1, 2]);
+    /// assert_eq!(subslice.index(0).read(), 3);
+    /// assert_eq!(subslice.index(1).read(), 4);
     /// ```
     pub fn as_slice(&self) -> Volatile<&[T], A> {
         self.map(|array| &array[..])
@@ -724,21 +719,20 @@ where
     ///
     /// ## Example
     ///
-    /// Copying two elements from a slice into a mutable array reference:
+    /// Writing to an index of a mutable array reference:
     ///
     /// ```
     /// use volatile::Volatile;
     ///
-    /// let src = [1, 2, 3, 4];
     /// let mut dst = [0, 0];
     /// let mut volatile = Volatile::new(&mut dst);
     ///
     /// // convert the `Volatile<&mut [i32; 2]>` array reference to a `Volatile<&mut [i32]>` slice
     /// let mut volatile_slice = volatile.as_mut_slice();
     /// // we can now use the slice methods
-    /// volatile_slice.copy_from_slice(&src[2..]);
+    /// volatile_slice.index_mut(1).write(1);
     ///
-    /// assert_eq!(dst, [3, 4]);
+    /// assert_eq!(dst, [0, 1]);
     /// ```
     pub fn as_mut_slice(&mut self) -> Volatile<&mut [T], A>
     where
