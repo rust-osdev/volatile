@@ -1,5 +1,7 @@
 # Unreleased
 
+- Remove the `const_generics` feature flag ([#25](https://github.com/rust-osdev/volatile/pull/25))
+
 # 0.4.4 – 2021-03-09
 
 - Replace feature "range_bounds_assert_len" with "slice_range" ([#21](https://github.com/rust-osdev/volatile/pull/21))
