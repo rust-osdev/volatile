@@ -1,5 +1,7 @@
 # Unreleased
 
+# 0.4.5 – 2022-04-24
+
 - Remove the `const_generics` feature flag ([#25](https://github.com/rust-osdev/volatile/pull/25))
 
 # 0.4.4 – 2021-03-09
