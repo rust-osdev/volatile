@@ -476,6 +476,24 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
         }
     }
 
+    /// Returns an iterator over the slice.
+    pub fn iter<'b>(
+        &'b self,
+    ) -> impl Iterator<Item = VolatilePtr<'b, T, Access<R, access::NoAccess>>> + 'b {
+        let len = self.len();
+        (0..len).map(move |i| self.index(i))
+    }
+
+    /// Returns an iterator that allows modifying each value.
+    pub fn iter_mut<'b>(
+        &'b mut self,
+    ) -> impl Iterator<Item = VolatilePtr<'b, T, Access<R, W>>> + 'b {
+        let ptr = self.as_ptr().as_ptr() as *mut T;
+        let len = self.len();
+        (0..len)
+            .map(move |i| unsafe { VolatilePtr::new_generic(NonNull::new_unchecked(ptr.add(i))) })
+    }
+
     /// Copies all elements from `self` into `dst`, using a volatile memcpy.
     ///
     /// The length of `dst` must be the same as `self`.
