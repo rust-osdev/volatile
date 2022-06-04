@@ -396,6 +396,10 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
         self.pointer.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.pointer.len() == 0
+    }
+
     /// Applies the index operation on the wrapped slice.
     ///
     /// Returns a shared `Volatile` reference to the resulting subslice.
