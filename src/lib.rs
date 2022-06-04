@@ -535,6 +535,7 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     pub fn copy_into_slice(&self, dst: &mut [T])
     where
         T: Copy,
+        R: access::Safe,
     {
         let len = self.pointer.len();
         assert_eq!(
@@ -591,6 +592,7 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     pub fn copy_from_slice(&mut self, src: &[T])
     where
         T: Copy,
+        W: access::Safe,
     {
         let len = self.pointer.len();
         assert_eq!(
@@ -644,6 +646,8 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     pub fn copy_within(&mut self, src: impl RangeBounds<usize>, dest: usize)
     where
         T: Copy,
+        R: access::Safe,
+        W: access::Safe,
     {
         let len = self.pointer.len();
         // implementation taken from https://github.com/rust-lang/rust/blob/683d1bcd405727fcc9209f64845bd3b9104878b8/library/core/src/slice/mod.rs#L2726-L2738
@@ -819,7 +823,7 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
 
 /// Methods for volatile byte slices
 #[cfg(feature = "unstable")]
-impl<A> VolatilePtr<'_, [u8], A> {
+impl<R, W> VolatilePtr<'_, [u8], Access<R, W>> {
     /// Sets all elements of the byte slice to the given `value` using a volatile `memset`.
     ///
     /// This method is similar to the `slice::fill` method of the standard library, with the
@@ -841,7 +845,10 @@ impl<A> VolatilePtr<'_, [u8], A> {
     /// buf.fill(1);
     /// assert_eq!(unsafe { buf.as_ptr().as_mut() }, &mut vec![1; 10]);
     /// ```
-    pub fn fill(&mut self, value: u8) {
+    pub fn fill(&mut self, value: u8)
+    where
+        W: access::Safe,
+    {
         unsafe {
             intrinsics::volatile_set_memory(self.pointer.as_mut_ptr(), value, self.pointer.len());
         }
