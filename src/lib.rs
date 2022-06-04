@@ -57,26 +57,57 @@ pub mod access;
 /// let field_2 = map_field!(volatile.field_2);
 /// assert_eq!(field_2.read(), 255);
 /// ```
+///
+/// Creating `VolatilePtr`s to unaligned field in packed structs is not allowed:
+/// ```compile_fail
+/// # extern crate core;
+/// use volatile::{VolatilePtr, map_field};
+/// use core::ptr::NonNull;
+///
+/// #[repr(packed)]
+/// struct Example { field_1: u8, field_2: usize, }
+/// let mut value = Example { field_1: 15, field_2: 255 };
+/// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
+///
+/// // Constructing a volatile reference to an unaligned field doesn't compile.
+/// let field_2 = map_field!(volatile.field_2);
+/// ```
 #[macro_export]
 macro_rules! map_field {
-    ($volatile:ident.$place:ident) => {
+    ($volatile:ident.$place:ident) => {{
+        // Simulate creating a reference to the field. This is done to make
+        // sure that the field is not potentially unaligned. The body of the
+        // if statement will never be executed, so it can never cause any UB.
+        if false {
+            #[deny(unaligned_references)]
+            let _ref_to_field = &(unsafe { &*$volatile.as_ptr().as_ptr() }).$place;
+        }
+
         unsafe {
             $volatile.map(|ptr| {
                 core::ptr::NonNull::new(core::ptr::addr_of_mut!((*ptr.as_ptr()).$place)).unwrap()
             })
         }
-    };
+    }};
 }
 
 #[macro_export]
 macro_rules! map_field_mut {
-    ($volatile:ident.$place:ident) => {
+    ($volatile:ident.$place:ident) => {{
+        // Simulate creating a reference to the field. This is done to make
+        // sure that the field is not potentially unaligned. The body of the
+        // if statement will never be executed, so it can never cause any UB.
+        if false {
+            #[deny(unaligned_references)]
+            let _ref_to_field = &(unsafe { &*$volatile.as_ptr().as_ptr() }).$place;
+        }
+
         unsafe {
             $volatile.map_mut(|ptr| {
                 core::ptr::NonNull::new(core::ptr::addr_of_mut!((*ptr.as_ptr()).$place)).unwrap()
             })
         }
-    };
+    }};
 }
 
 // this must be defined after the `map_field` macros
