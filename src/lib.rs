@@ -863,6 +863,38 @@ impl<T, R, W, const N: usize> VolatilePtr<'_, [T; N], Access<R, W>> {
             })
         }
     }
+
+    /// Converts an array reference to a shared slice.
+    ///
+    /// This makes it possible to use the methods defined on slices.
+    ///
+    /// ## Example
+    ///
+    /// Copying two elements into a volatile array reference using `copy_from_slice`:
+    ///
+    /// ```
+    /// # extern crate core;
+    /// use volatile::VolatilePtr;
+    /// use core::ptr::NonNull;
+    ///
+    /// let src = [1, 2];
+    /// let mut dst = [0, 0];
+    /// let mut volatile = unsafe { VolatilePtr::new_write_only(NonNull::from(&dst)) };
+    ///
+    /// // convert the `Volatile<[i32; 2]>` array reference to a `Volatile<[i32]>` slice
+    /// let mut volatile_slice = volatile.as_slice_mut();
+    /// // we can now use the slice methods
+    /// volatile_slice.copy_from_slice(&src);
+    ///
+    /// assert_eq!(dst, [1, 2]);
+    /// ```
+    pub fn as_slice_mut<'a>(&'a mut self) -> VolatilePtr<'a, [T], Access<R, W>> {
+        unsafe {
+            self.map_mut(|array| {
+                NonNull::new(ptr::slice_from_raw_parts_mut(array.as_ptr() as *mut T, N)).unwrap()
+            })
+        }
+    }
 }
 
 /// Methods for restricting access.
