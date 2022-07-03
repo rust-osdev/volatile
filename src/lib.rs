@@ -865,7 +865,8 @@ impl<R, W> VolatilePtr<'_, [u8], Access<R, W>> {
     /// use volatile::VolatilePtr;
     /// use core::ptr::NonNull;
     ///
-    /// let mut buf = unsafe { VolatilePtr::new_read_write(NonNull::from(vec![0; 10].as_mut_slice())) };
+    /// let mut vec = vec![0; 10];
+    /// let mut buf = unsafe { VolatilePtr::new_read_write(NonNull::from(vec.as_mut_slice())) };
     /// buf.fill(1);
     /// assert_eq!(unsafe { buf.as_ptr().as_mut() }, &mut vec![1; 10]);
     /// ```
