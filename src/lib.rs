@@ -14,6 +14,9 @@
 #![warn(missing_docs)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
+pub use cell::VolatileCell;
+pub use ptr::VolatilePtr;
+
 pub mod access;
 mod cell;
 mod ptr;
