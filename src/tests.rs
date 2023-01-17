@@ -1,6 +1,6 @@
 use core::ptr::NonNull;
 
-use super::{access::*, VolatilePtr};
+use super::{access_ptr::*, ptr::VolatilePtr};
 
 #[test]
 fn test_read() {
