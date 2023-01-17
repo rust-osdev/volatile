@@ -131,6 +131,10 @@ where
         unsafe { VolatilePtr::new(reference.into()) }
     }
 
+    pub const unsafe fn new_read_only(pointer: NonNull<T>) -> VolatilePtr<'a, T, ReadOnly> {
+        unsafe { Self::new_restricted(ReadOnly, pointer) }
+    }
+
     pub const unsafe fn new_restricted<A>(access: A, pointer: NonNull<T>) -> VolatilePtr<'a, T, A>
     where
         A: Access,
