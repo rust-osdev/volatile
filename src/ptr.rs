@@ -114,7 +114,7 @@ where
     access: PhantomData<A>,
 }
 
-impl<'a, T> VolatilePtr<'a, T>
+impl<'a, T> VolatilePtr<'a, T, ReadWrite>
 where
     T: ?Sized,
 {
