@@ -5,7 +5,6 @@
 //! The wrapper types *do not* enforce any atomicity guarantees; to also get atomicity, consider
 //! looking at the `Atomic` wrapper types found in `libcore` or `libstd`.
 
-use access_ptr::{Access, NoAccess, ReadOnly, ReadWrite, WriteOnly};
 use core::{
     fmt,
     marker::PhantomData,
@@ -19,7 +18,7 @@ use core::{
     slice::{range, SliceIndex},
 };
 
-use crate::access_ptr;
+use crate::access::{Access, ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
 
 /// TODO
 ///
@@ -93,7 +92,7 @@ macro_rules! map_field_mut {
     }};
 }
 
-/// Wraps a reference to make accesses to the referenced value volatile.
+/// Wraps a pointer to make accesses to the referenced value volatile.
 ///
 /// Allows volatile reads and writes on the referenced value. The referenced value needs to
 /// be `Copy` for reading and writing, as volatile reads and writes take and return copies
@@ -115,83 +114,50 @@ where
     access: PhantomData<A>,
 }
 
-/// Constructor functions for creating new values
-///
-/// These functions allow to construct a new `Volatile` instance from a reference type. While
-/// the `new` function creates a `Volatile` instance with unrestricted access, there are also
-/// functions for creating read-only or write-only instances.
-impl<T> VolatilePtr<'_, T>
+impl<'a, T> VolatilePtr<'a, T>
 where
     T: ?Sized,
 {
-    pub unsafe fn new_read_write(pointer: NonNull<T>) -> VolatilePtr<'static, T> {
-        unsafe { VolatilePtr::new_with_access(pointer, Access::read_write()) }
+    pub unsafe fn new(pointer: NonNull<T>) -> Self {
+        unsafe { VolatilePtr::new_restricted(ReadWrite, pointer) }
     }
 
-    pub const unsafe fn new_read_only(pointer: NonNull<T>) -> VolatilePtr<'static, T, ReadOnly> {
-        unsafe { VolatilePtr::new_with_access(pointer, Access::read_only()) }
+    pub fn from_mut_ref(reference: &'a mut T) -> Self
+    where
+        T: 'a,
+    {
+        unsafe { VolatilePtr::new(reference.into()) }
     }
+}
 
-    pub const unsafe fn new_write_only(pointer: NonNull<T>) -> VolatilePtr<'static, T, WriteOnly> {
-        unsafe { VolatilePtr::new_with_access(pointer, Access::write_only()) }
-    }
-
-    /// Constructs a new volatile instance wrapping the given reference.
-    ///
-    /// While it is possible to construct `Volatile` instances from arbitrary values (including
-    /// non-reference values), most of the methods are only available when the wrapped type is
-    /// a reference. The only reason that we don't forbid non-reference types in the constructor
-    /// functions is that the Rust compiler does not support trait bounds on generic `const`
-    /// functions yet. When this becomes possible, we will release a new version of this library
-    /// with removed support for non-references. For these reasons it is recommended to use
-    /// the `Volatile` type only with references.
-    ///
-    /// ## Example
-    ///
-    /// ```rust
-    /// # extern crate core;
-    /// use volatile::VolatilePtr;
-    /// use core::ptr::NonNull;
-    ///
-    /// let mut value = 0u32;
-    ///
-    /// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
-    /// volatile.write(1);
-    /// assert_eq!(volatile.read(), 1);
-    /// ```
-    pub const unsafe fn new_with_access<A>(
-        pointer: NonNull<T>,
-        access: A,
-    ) -> VolatilePtr<'static, T, A> {
-        mem::forget(access); // needed because we cannot require `A: Copy` on stable Rust yet
-        unsafe { Self::new_generic(pointer) }
-    }
-
-    pub const unsafe fn new_generic<'a, A>(pointer: NonNull<T>) -> VolatilePtr<'a, T, A> {
+impl<T, A> VolatilePtr<'_, T, A>
+where
+    A: Access,
+    T: ?Sized,
+{
+    pub const unsafe fn new_restricted(access: A, pointer: NonNull<T>) -> Self {
+        let _ = access;
         VolatilePtr {
             pointer,
             reference: PhantomData,
             access: PhantomData,
         }
     }
-
-    pub fn from_ref<'a>(reference: &'a T) -> VolatilePtr<'a, T, ReadOnly>
+}
+impl<'a, T> VolatilePtr<'a, T, ReadOnly>
+where
+    T: ?Sized,
+{
+    pub fn from_ref(reference: &'a T) -> Self
     where
         T: 'a,
     {
-        unsafe { VolatilePtr::new_generic(reference.into()) }
-    }
-
-    pub fn from_mut_ref<'a>(reference: &'a mut T) -> VolatilePtr<'a, T>
-    where
-        T: 'a,
-    {
-        unsafe { VolatilePtr::new_generic(reference.into()) }
+        unsafe { VolatilePtr::new_restricted(ReadOnly, reference.into()) }
     }
 }
 
 /// Methods for references to `Copy` types
-impl<T, R, W> VolatilePtr<'_, T, Access<R, W>>
+impl<T, A> VolatilePtr<'_, T, A>
 where
     T: Copy + ?Sized,
 {
@@ -219,10 +185,10 @@ where
     /// ```
     pub fn read(&self) -> T
     where
-        R: access_ptr::Safe,
+        A: Readable,
     {
         // UNSAFE: Safe, as ... TODO
-        unsafe { self.read_unsafe() }
+        unsafe { ptr::read_volatile(self.pointer.as_ptr()) }
     }
 
     /// Performs a volatile write, setting the contained value to the given `value`.
@@ -246,10 +212,10 @@ where
     /// ```
     pub fn write(&mut self, value: T)
     where
-        W: access_ptr::Safe,
+        A: Writable,
     {
         // UNSAFE: Safe, as ... TODO
-        unsafe { self.write_unsafe(value) };
+        unsafe { ptr::write_volatile(self.pointer.as_ptr(), value) };
     }
 
     /// Updates the contained value using the given closure and volatile instructions.
@@ -271,11 +237,11 @@ where
     /// ```
     pub fn update<F>(&mut self, f: F)
     where
-        R: access_ptr::Safe,
-        W: access_ptr::Safe,
-        F: FnOnce(&mut T),
+        A: Readable + Writable,
+        F: FnOnce(T) -> T,
     {
-        unsafe { self.update_unsafe(f) }
+        let new = f(self.read());
+        self.write(new);
     }
 }
 
@@ -316,18 +282,21 @@ where
 }
 
 /// Transformation methods for accessing struct fields
-impl<'a, T, R, W> VolatilePtr<'a, T, Access<R, W>>
+impl<'a, T, A> VolatilePtr<'a, T, A>
 where
     T: ?Sized,
 {
     // TODO: Add documentation
-    pub fn borrow(&self) -> VolatilePtr<T, Access<R, NoAccess>> {
-        unsafe { VolatilePtr::new_generic(self.pointer) }
+    pub fn borrow(&self) -> VolatilePtr<T, ReadOnly> {
+        unsafe { VolatilePtr::new_restricted(ReadOnly, self.pointer) }
     }
 
     // TODO: Add documentation
-    pub fn borrow_mut(&mut self) -> VolatilePtr<T, Access<R, W>> {
-        unsafe { VolatilePtr::new_generic(self.pointer) }
+    pub fn borrow_mut(&mut self) -> VolatilePtr<T, A>
+    where
+        A: Access,
+    {
+        unsafe { VolatilePtr::new_restricted(A::default(), self.pointer) }
     }
 
     /// Constructs a new `Volatile` reference by mapping the wrapped pointer.
@@ -371,12 +340,12 @@ where
     ///    value
     /// })};
     /// ```
-    pub unsafe fn map<F, U>(self, f: F) -> VolatilePtr<'a, U, Access<R, access_ptr::NoAccess>>
+    pub unsafe fn map<F, U>(self, f: F) -> VolatilePtr<'a, U, ReadOnly>
     where
         F: FnOnce(NonNull<T>) -> NonNull<U>,
         U: ?Sized,
     {
-        unsafe { VolatilePtr::new_generic(f(self.pointer)) }
+        unsafe { VolatilePtr::new_restricted(ReadOnly, f(self.pointer)) }
     }
 
     #[cfg(feature = "very_unstable")]
@@ -391,12 +360,13 @@ where
         unsafe { VolatilePtr::new_generic(f(self.pointer)) }
     }
 
-    pub unsafe fn map_mut<F, U>(self, f: F) -> VolatilePtr<'a, U, Access<R, W>>
+    pub unsafe fn map_mut<F, U>(self, f: F) -> VolatilePtr<'a, U, A>
     where
         F: FnOnce(NonNull<T>) -> NonNull<U>,
         U: ?Sized,
+        A: Access,
     {
-        unsafe { VolatilePtr::new_generic(f(self.pointer)) }
+        unsafe { VolatilePtr::new_restricted(A::default(), f(self.pointer)) }
     }
 
     #[cfg(feature = "very_unstable")]
@@ -931,7 +901,7 @@ impl<'a, T, R, W, const N: usize> VolatilePtr<'a, [T; N], Access<R, W>> {
 }
 
 /// Methods for restricting access.
-impl<'a, T, R, W> VolatilePtr<'a, T, Access<R, W>>
+impl<'a, T> VolatilePtr<'a, T, ReadWrite>
 where
     T: ?Sized,
 {
@@ -951,8 +921,8 @@ where
     /// assert_eq!(read_only.read(), -4);
     /// // read_only.write(10); // compile-time error
     /// ```
-    pub fn read_only(self) -> VolatilePtr<'a, T, Access<R, access_ptr::NoAccess>> {
-        unsafe { VolatilePtr::new_generic(self.pointer) }
+    pub fn read_only(self) -> VolatilePtr<'a, T, ReadOnly> {
+        unsafe { VolatilePtr::new_restricted(ReadOnly, self.pointer) }
     }
 
     /// Restricts access permissions to write-only.
@@ -975,68 +945,18 @@ where
     /// field_2.write(14);
     /// // field_2.read(); // compile-time error
     /// ```
-    pub fn write_only(self) -> VolatilePtr<'a, T, Access<access_ptr::NoAccess, W>> {
-        unsafe { VolatilePtr::new_generic(self.pointer) }
+    pub fn write_only(self) -> VolatilePtr<'a, T, WriteOnly> {
+        unsafe { VolatilePtr::new_restricted(WriteOnly, self.pointer) }
     }
 }
 
-/// Unsafe access methods for references to `Copy` types
-impl<T, R, W> VolatilePtr<'_, T, Access<R, W>>
-where
-    T: Copy + ?Sized,
-{
-    pub unsafe fn read_unsafe(&self) -> T
-    where
-        R: access_ptr::Unsafe,
-    {
-        unsafe { ptr::read_volatile(self.pointer.as_ptr()) }
-    }
-
-    pub unsafe fn write_unsafe(&mut self, value: T)
-    where
-        W: access_ptr::Unsafe,
-    {
-        unsafe { ptr::write_volatile(self.pointer.as_ptr(), value) };
-    }
-
-    pub unsafe fn update_unsafe<F>(&mut self, f: F)
-    where
-        R: access_ptr::Unsafe,
-        W: access_ptr::Unsafe,
-        F: FnOnce(&mut T),
-    {
-        let mut value = unsafe { self.read_unsafe() };
-        f(&mut value);
-        unsafe { self.write_unsafe(value) };
-    }
-}
-
-impl<T, W> fmt::Debug for VolatilePtr<'_, T, Access<access_ptr::SafeAccess, W>>
+impl<T, A> fmt::Debug for VolatilePtr<'_, T, A>
 where
     T: Copy + fmt::Debug + ?Sized,
+    A: Readable,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Volatile").field(&self.read()).finish()
-    }
-}
-
-impl<T, W> fmt::Debug for VolatilePtr<'_, T, Access<access_ptr::UnsafeAccess, W>>
-where
-    T: ?Sized,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Volatile").field(&"[unsafe read]").finish()
-    }
-}
-
-impl<T, W> fmt::Debug for VolatilePtr<'_, T, Access<access_ptr::NoAccess, W>>
-where
-    T: ?Sized,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Volatile")
-            .field(&"[no read access]")
-            .finish()
     }
 }
 

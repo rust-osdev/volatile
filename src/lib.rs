@@ -15,6 +15,5 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 pub mod access;
-mod access_ptr;
 mod cell;
 mod ptr;
