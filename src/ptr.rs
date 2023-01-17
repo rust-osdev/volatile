@@ -31,7 +31,7 @@ use crate::access::{Access, ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
 ///
 /// struct Example { field_1: u32, field_2: u8, }
 /// let mut value = Example { field_1: 15, field_2: 255 };
-/// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
+/// let mut volatile = VolatilePtr::from_mut_ref(&mut value);
 ///
 /// // construct a volatile reference to a field
 /// let field_2 = map_field!(volatile.field_2);
@@ -46,7 +46,7 @@ use crate::access::{Access, ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
 /// #[repr(packed)]
 /// struct Example { field_1: u8, field_2: usize, }
 /// let mut value = Example { field_1: 15, field_2: 255 };
-/// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
+/// let mut volatile = VolatilePtr::from_mut_ref(&mut value);
 ///
 /// // Constructing a volatile reference to an unaligned field doesn't compile.
 /// let field_2 = map_field!(volatile.field_2);
@@ -165,15 +165,17 @@ where
     /// ## Examples
     ///
     /// ```rust
-    /// use volatile::VolatilePtr;
+    /// use volatile::{VolatilePtr, access};
     /// use core::ptr::NonNull;
     ///
     /// let value = 42;
-    /// let shared_reference = unsafe { VolatilePtr::new_read_only(NonNull::from(&value)) };
+    /// let shared_reference = unsafe {
+    ///     VolatilePtr::new_restricted(access::ReadOnly, NonNull::from(&value))
+    /// };
     /// assert_eq!(shared_reference.read(), 42);
     ///
     /// let mut value = 50;
-    /// let mut_reference = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
+    /// let mut_reference = VolatilePtr::from_mut_ref(&mut value);
     /// assert_eq!(mut_reference.read(), 50);
     /// ```
     pub fn read(&self) -> T
@@ -198,7 +200,7 @@ where
     /// use core::ptr::NonNull;
     ///
     /// let mut value = 42;
-    /// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
+    /// let mut volatile = VolatilePtr::from_mut_ref(&mut value);
     /// volatile.write(50);
     ///
     /// assert_eq!(volatile.read(), 50);
@@ -223,8 +225,8 @@ where
     /// use core::ptr::NonNull;
     ///
     /// let mut value = 42;
-    /// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
-    /// volatile.update(|val| *val += 1);
+    /// let mut volatile = VolatilePtr::from_mut_ref(&mut value);
+    /// volatile.update(|val| val + 1);
     ///
     /// assert_eq!(volatile.read(), 43);
     /// ```
@@ -257,7 +259,7 @@ where
     /// use core::ptr::NonNull;
     ///
     /// let mut value = 42;
-    /// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
+    /// let mut volatile = VolatilePtr::from_mut_ref(&mut value);
     /// volatile.write(50);
     /// let unwrapped: *mut i32 = volatile.as_ptr().as_ptr();
     ///
@@ -299,7 +301,7 @@ where
     ///
     /// struct Example { field_1: u32, field_2: u8, }
     /// let mut value = Example { field_1: 15, field_2: 255 };
-    /// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
+    /// let mut volatile = VolatilePtr::from_mut_ref(&mut value);
     ///
     /// // construct a volatile reference to a field
     /// let field_2 = unsafe { volatile.map(|ptr| NonNull::new(core::ptr::addr_of_mut!((*ptr.as_ptr()).field_2)).unwrap()) };
@@ -313,7 +315,7 @@ where
     /// use core::ptr::NonNull;
     ///
     /// let mut value = 5;
-    /// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
+    /// let mut volatile = VolatilePtr::from_mut_ref(&mut value);
     ///
     /// // DON'T DO THIS:
     /// let mut readout = 0;
@@ -375,7 +377,7 @@ where
     /// use core::ptr::NonNull;
     ///
     /// let mut value: i16 = -4;
-    /// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
+    /// let mut volatile = VolatilePtr::from_mut_ref(&mut value);
     ///
     /// let read_only = volatile.read_only();
     /// assert_eq!(read_only.read(), -4);
@@ -397,7 +399,7 @@ where
     ///
     /// struct Example { field_1: u32, field_2: u8, }
     /// let mut value = Example { field_1: 15, field_2: 255 };
-    /// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
+    /// let mut volatile = VolatilePtr::from_mut_ref(&mut value);
     ///
     /// // construct a volatile write-only reference to `field_2`
     /// let mut field_2 = map_field_mut!(volatile.field_2).write_only();
@@ -596,9 +598,8 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     /// let mut dst = [0, 0];
     /// // the `Volatile` type does not work with arrays, so convert `dst` to a slice
     /// let slice = &mut dst[..];
-    /// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(slice))};
-    ///
-    /// // Because the slices have to be the same length,
+    /// let mut volatile = VolatilePtr::from_mut_ref(lice);
+    ///    /// // Because the slices have to be the same length,
     /// // we slice the source slice from four elements
     /// // to two. It will panic if we don't do this.
     /// volatile.copy_from_slice(&src[2..]);
@@ -655,8 +656,7 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     ///
     /// let mut byte_array = *b"Hello, World!";
     /// let mut slice: &mut [u8] = &mut byte_array[..];
-    /// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(slice)) };
-    ///
+    /// let mut volatile = VolatilePtr::from_mut_ref(lice)) };    /
     /// volatile.copy_within(1..5, 8);
     ///
     /// assert_eq!(&byte_array, b"Hello, Wello!");
@@ -840,7 +840,7 @@ impl<R, W> VolatilePtr<'_, [u8], Access<R, W>> {
     /// use core::ptr::NonNull;
     ///
     /// let mut vec = vec![0; 10];
-    /// let mut buf = unsafe { VolatilePtr::new_read_write(NonNull::from(vec.as_mut_slice())) };
+    /// let mut buf = VolatilePtr::from_mut_ref(ec.as_mut_slice());
     /// buf.fill(1);
     /// assert_eq!(unsafe { buf.as_ptr().as_mut() }, &mut vec![1; 10]);
     /// ```
