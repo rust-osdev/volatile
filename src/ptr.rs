@@ -342,12 +342,10 @@ where
     }
 
     #[cfg(feature = "very_unstable")]
-    pub const unsafe fn map_const<F, U>(
-        self,
-        f: F,
-    ) -> VolatilePtr<'a, U, Access<R, access_ptr::NoAccess>>
+    pub const unsafe fn map_const<F, U>(self, f: F) -> VolatilePtr<'a, U, A::RestrictShared>
     where
-        F: FnOnce(NonNull<T>) -> NonNull<U>,
+        F: ~const FnOnce(NonNull<T>) -> NonNull<U>,
+        A: Access,
         U: ?Sized,
     {
         unsafe { VolatilePtr::new_generic(f(self.pointer)) }
@@ -363,9 +361,9 @@ where
     }
 
     #[cfg(feature = "very_unstable")]
-    pub const unsafe fn map_mut_const<F, U>(self, f: F) -> VolatilePtr<'a, U, Access<R, W>>
+    pub const unsafe fn map_mut_const<F, U>(self, f: F) -> VolatilePtr<'a, U, A>
     where
-        F: FnOnce(NonNull<T>) -> NonNull<U>,
+        F: ~const FnOnce(NonNull<T>) -> NonNull<U>,
         U: ?Sized,
     {
         unsafe { VolatilePtr::new_generic(f(self.pointer)) }
@@ -479,16 +477,24 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
     }
 
     #[cfg(feature = "very_unstable")]
-    pub const fn index_const(
-        self,
-        index: usize,
-    ) -> VolatilePtr<'a, T, Access<R, access_ptr::NoAccess>> {
+    pub const fn index_const(self, index: usize) -> VolatilePtr<'a, T, A::RestrictShared>
+    where
+        A: Access,
+    {
         assert!(index < self.pointer.len(), "index out of bounds");
-        unsafe {
-            self.map_const(|slice| {
-                NonNull::new_unchecked(slice.as_non_null_ptr().as_ptr().add(index))
-            })
+
+        struct Mapper {
+            index: usize,
         }
+        impl<T> const FnOnce<(NonNull<[T]>,)> for Mapper {
+            type Output = NonNull<T>;
+
+            extern "rust-call" fn call_once(self, (slice,): (NonNull<[T]>,)) -> Self::Output {
+                unsafe { NonNull::new_unchecked(slice.as_non_null_ptr().as_ptr().add(self.index)) }
+            }
+        }
+
+        unsafe { self.map_const(Mapper { index }) }
     }
 
     pub fn index_mut<I>(self, index: I) -> VolatilePtr<'a, <I as SliceIndex<[T]>>::Output, A>
@@ -502,13 +508,21 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
     }
 
     #[cfg(feature = "very_unstable")]
-    pub const fn index_mut_const(self, index: usize) -> VolatilePtr<'a, T, Access<R, W>> {
+    pub const fn index_mut_const(self, index: usize) -> VolatilePtr<'a, T, A> {
         assert!(index < self.pointer.len(), "index out of bounds");
-        unsafe {
-            self.map_mut_const(|slice| {
-                NonNull::new_unchecked(slice.as_non_null_ptr().as_ptr().add(index))
-            })
+
+        struct Mapper {
+            index: usize,
         }
+        impl<T> const FnOnce<(NonNull<[T]>,)> for Mapper {
+            type Output = NonNull<T>;
+
+            extern "rust-call" fn call_once(self, (slice,): (NonNull<[T]>,)) -> Self::Output {
+                unsafe { NonNull::new_unchecked(slice.as_non_null_ptr().as_ptr().add(self.index)) }
+            }
+        }
+
+        unsafe { self.map_mut_const(Mapper { index }) }
     }
 
     /// Returns an iterator over the slice.
