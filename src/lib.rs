@@ -21,7 +21,7 @@
 #![warn(missing_docs)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
-use access::{Access, ReadOnly, ReadWrite, WriteOnly};
+use access::{Access, NoAccess, ReadOnly, ReadWrite, WriteOnly};
 use core::{
     fmt,
     marker::PhantomData,
@@ -57,26 +57,57 @@ pub mod access;
 /// let field_2 = map_field!(volatile.field_2);
 /// assert_eq!(field_2.read(), 255);
 /// ```
+///
+/// Creating `VolatilePtr`s to unaligned field in packed structs is not allowed:
+/// ```compile_fail
+/// # extern crate core;
+/// use volatile::{VolatilePtr, map_field};
+/// use core::ptr::NonNull;
+///
+/// #[repr(packed)]
+/// struct Example { field_1: u8, field_2: usize, }
+/// let mut value = Example { field_1: 15, field_2: 255 };
+/// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
+///
+/// // Constructing a volatile reference to an unaligned field doesn't compile.
+/// let field_2 = map_field!(volatile.field_2);
+/// ```
 #[macro_export]
 macro_rules! map_field {
-    ($volatile:ident.$place:ident) => {
+    ($volatile:ident.$place:ident) => {{
+        // Simulate creating a reference to the field. This is done to make
+        // sure that the field is not potentially unaligned. The body of the
+        // if statement will never be executed, so it can never cause any UB.
+        if false {
+            #[deny(unaligned_references)]
+            let _ref_to_field = &(unsafe { &*$volatile.as_ptr().as_ptr() }).$place;
+        }
+
         unsafe {
             $volatile.map(|ptr| {
                 core::ptr::NonNull::new(core::ptr::addr_of_mut!((*ptr.as_ptr()).$place)).unwrap()
             })
         }
-    };
+    }};
 }
 
 #[macro_export]
 macro_rules! map_field_mut {
-    ($volatile:ident.$place:ident) => {
+    ($volatile:ident.$place:ident) => {{
+        // Simulate creating a reference to the field. This is done to make
+        // sure that the field is not potentially unaligned. The body of the
+        // if statement will never be executed, so it can never cause any UB.
+        if false {
+            #[deny(unaligned_references)]
+            let _ref_to_field = &(unsafe { &*$volatile.as_ptr().as_ptr() }).$place;
+        }
+
         unsafe {
             $volatile.map_mut(|ptr| {
                 core::ptr::NonNull::new(core::ptr::addr_of_mut!((*ptr.as_ptr()).$place)).unwrap()
             })
         }
-    };
+    }};
 }
 
 // this must be defined after the `map_field` macros
@@ -306,10 +337,20 @@ where
 }
 
 /// Transformation methods for accessing struct fields
-impl<T, R, W> VolatilePtr<'_, T, Access<R, W>>
+impl<'a, T, R, W> VolatilePtr<'a, T, Access<R, W>>
 where
     T: ?Sized,
 {
+    // TODO: Add documentation
+    pub fn borrow(&self) -> VolatilePtr<T, Access<R, NoAccess>> {
+        unsafe { VolatilePtr::new_generic(self.pointer) }
+    }
+
+    // TODO: Add documentation
+    pub fn borrow_mut(&mut self) -> VolatilePtr<T, Access<R, W>> {
+        unsafe { VolatilePtr::new_generic(self.pointer) }
+    }
+
     /// Constructs a new `Volatile` reference by mapping the wrapped pointer.
     ///
     /// This method is useful for accessing only a part of a volatile value, e.g. a subslice or
@@ -351,7 +392,7 @@ where
     ///    value
     /// })};
     /// ```
-    pub unsafe fn map<'a, F, U>(&'a self, f: F) -> VolatilePtr<'a, U, Access<R, access::NoAccess>>
+    pub unsafe fn map<F, U>(self, f: F) -> VolatilePtr<'a, U, Access<R, access::NoAccess>>
     where
         F: FnOnce(NonNull<T>) -> NonNull<U>,
         U: ?Sized,
@@ -360,8 +401,8 @@ where
     }
 
     #[cfg(feature = "very_unstable")]
-    pub const unsafe fn map_const<'a, F, U>(
-        &'a self,
+    pub const unsafe fn map_const<F, U>(
+        self,
         f: F,
     ) -> VolatilePtr<'a, U, Access<R, access::NoAccess>>
     where
@@ -371,7 +412,7 @@ where
         unsafe { VolatilePtr::new_generic(f(self.pointer)) }
     }
 
-    pub unsafe fn map_mut<F, U>(&mut self, f: F) -> VolatilePtr<U, Access<R, W>>
+    pub unsafe fn map_mut<F, U>(self, f: F) -> VolatilePtr<'a, U, Access<R, W>>
     where
         F: FnOnce(NonNull<T>) -> NonNull<U>,
         U: ?Sized,
@@ -380,7 +421,7 @@ where
     }
 
     #[cfg(feature = "very_unstable")]
-    pub const unsafe fn map_mut_const<F, U>(&mut self, f: F) -> VolatilePtr<U, Access<R, W>>
+    pub const unsafe fn map_mut_const<F, U>(self, f: F) -> VolatilePtr<'a, U, Access<R, W>>
     where
         F: FnOnce(NonNull<T>) -> NonNull<U>,
         U: ?Sized,
@@ -394,6 +435,10 @@ where
 impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     pub fn len(&self) -> usize {
         self.pointer.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.pointer.len() == 0
     }
 
     /// Applies the index operation on the wrapped slice.
@@ -433,9 +478,9 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     /// assert_eq!(subslice.index(0).read(), 2);
     /// ```
     pub fn index<I>(
-        &self,
+        self,
         index: I,
-    ) -> VolatilePtr<<I as SliceIndex<[T]>>::Output, Access<R, access::NoAccess>>
+    ) -> VolatilePtr<'a, <I as SliceIndex<[T]>>::Output, Access<R, access::NoAccess>>
     where
         I: SliceIndex<[T]> + SliceIndex<[()]> + Clone,
     {
@@ -445,7 +490,10 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     }
 
     #[cfg(feature = "very_unstable")]
-    pub const fn index_const(&self, index: usize) -> VolatilePtr<T, Access<R, access::NoAccess>> {
+    pub const fn index_const(
+        self,
+        index: usize,
+    ) -> VolatilePtr<'a, T, Access<R, access::NoAccess>> {
         assert!(index < self.pointer.len(), "index out of bounds");
         unsafe {
             self.map_const(|slice| {
@@ -455,9 +503,9 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     }
 
     pub fn index_mut<I>(
-        &mut self,
+        self,
         index: I,
-    ) -> VolatilePtr<<I as SliceIndex<[T]>>::Output, Access<R, W>>
+    ) -> VolatilePtr<'a, <I as SliceIndex<[T]>>::Output, Access<R, W>>
     where
         I: SliceIndex<[T]> + SliceIndex<[()]> + Clone,
     {
@@ -467,13 +515,29 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     }
 
     #[cfg(feature = "very_unstable")]
-    pub const fn index_mut_const(&mut self, index: usize) -> VolatilePtr<T, Access<R, W>> {
+    pub const fn index_mut_const(self, index: usize) -> VolatilePtr<'a, T, Access<R, W>> {
         assert!(index < self.pointer.len(), "index out of bounds");
         unsafe {
             self.map_mut_const(|slice| {
                 NonNull::new_unchecked(slice.as_non_null_ptr().as_ptr().add(index))
             })
         }
+    }
+
+    /// Returns an iterator over the slice.
+    pub fn iter(self) -> impl Iterator<Item = VolatilePtr<'a, T, Access<R, access::NoAccess>>> {
+        let ptr = self.as_ptr().as_ptr() as *mut T;
+        let len = self.len();
+        (0..len)
+            .map(move |i| unsafe { VolatilePtr::new_generic(NonNull::new_unchecked(ptr.add(i))) })
+    }
+
+    /// Returns an iterator that allows modifying each value.
+    pub fn iter_mut(self) -> impl Iterator<Item = VolatilePtr<'a, T, Access<R, W>>> {
+        let ptr = self.as_ptr().as_ptr() as *mut T;
+        let len = self.len();
+        (0..len)
+            .map(move |i| unsafe { VolatilePtr::new_generic(NonNull::new_unchecked(ptr.add(i))) })
     }
 
     /// Copies all elements from `self` into `dst`, using a volatile memcpy.
@@ -513,6 +577,7 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     pub fn copy_into_slice(&self, dst: &mut [T])
     where
         T: Copy,
+        R: access::Safe,
     {
         let len = self.pointer.len();
         assert_eq!(
@@ -569,6 +634,7 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     pub fn copy_from_slice(&mut self, src: &[T])
     where
         T: Copy,
+        W: access::Safe,
     {
         let len = self.pointer.len();
         assert_eq!(
@@ -622,6 +688,8 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     pub fn copy_within(&mut self, src: impl RangeBounds<usize>, dest: usize)
     where
         T: Copy,
+        R: access::Safe,
+        W: access::Safe,
     {
         let len = self.pointer.len();
         // implementation taken from https://github.com/rust-lang/rust/blob/683d1bcd405727fcc9209f64845bd3b9104878b8/library/core/src/slice/mod.rs#L2726-L2738
@@ -643,11 +711,11 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     }
 
     pub fn split_at(
-        &self,
+        self,
         mid: usize,
     ) -> (
-        VolatilePtr<[T], Access<R, access::NoAccess>>,
-        VolatilePtr<[T], Access<R, access::NoAccess>>,
+        VolatilePtr<'a, [T], Access<R, access::NoAccess>>,
+        VolatilePtr<'a, [T], Access<R, access::NoAccess>>,
     ) {
         assert!(mid <= self.pointer.len());
         // SAFETY: `[ptr; mid]` and `[mid; len]` are inside `self`, which
@@ -656,11 +724,11 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     }
 
     pub fn split_at_mut(
-        &mut self,
+        self,
         mid: usize,
     ) -> (
-        VolatilePtr<[T], Access<R, W>>,
-        VolatilePtr<[T], Access<R, W>>,
+        VolatilePtr<'a, [T], Access<R, W>>,
+        VolatilePtr<'a, [T], Access<R, W>>,
     ) {
         assert!(mid <= self.pointer.len());
         // SAFETY: `[ptr; mid]` and `[mid; len]` are inside `self`, which
@@ -669,11 +737,11 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     }
 
     unsafe fn split_at_unchecked(
-        &self,
+        self,
         mid: usize,
     ) -> (
-        VolatilePtr<[T], Access<R, access::NoAccess>>,
-        VolatilePtr<[T], Access<R, access::NoAccess>>,
+        VolatilePtr<'a, [T], Access<R, access::NoAccess>>,
+        VolatilePtr<'a, [T], Access<R, access::NoAccess>>,
     ) {
         // SAFETY: Caller has to check that `0 <= mid <= self.len()`
         unsafe {
@@ -685,11 +753,11 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     }
 
     unsafe fn split_at_mut_unchecked(
-        &mut self,
+        self,
         mid: usize,
     ) -> (
-        VolatilePtr<[T], Access<R, W>>,
-        VolatilePtr<[T], Access<R, W>>,
+        VolatilePtr<'a, [T], Access<R, W>>,
+        VolatilePtr<'a, [T], Access<R, W>>,
     ) {
         let len = self.pointer.len();
         let ptr = self.pointer.as_mut_ptr();
@@ -711,23 +779,23 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     }
 
     pub fn as_chunks<const N: usize>(
-        &self,
+        self,
     ) -> (
-        VolatilePtr<[[T; N]], Access<R, access::NoAccess>>,
-        VolatilePtr<[T], Access<R, access::NoAccess>>,
+        VolatilePtr<'a, [[T; N]], Access<R, access::NoAccess>>,
+        VolatilePtr<'a, [T], Access<R, access::NoAccess>>,
     ) {
         assert_ne!(N, 0);
         let len = self.pointer.len() / N;
         let (multiple_of_n, remainder) = self.split_at(len * N);
         // SAFETY: We already panicked for zero, and ensured by construction
         // that the length of the subslice is a multiple of N.
-        let array_slice = unsafe { multiple_of_n.as_chunks_unchecked_by_val() };
+        let array_slice = unsafe { multiple_of_n.as_chunks_unchecked() };
         (array_slice, remainder)
     }
 
     pub unsafe fn as_chunks_unchecked<const N: usize>(
-        &self,
-    ) -> VolatilePtr<[[T; N]], Access<R, access::NoAccess>> {
+        self,
+    ) -> VolatilePtr<'a, [[T; N]], Access<R, access::NoAccess>> {
         debug_assert_ne!(N, 0);
         debug_assert_eq!(self.pointer.len() % N, 0);
         let new_len =
@@ -744,39 +812,21 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     }
 
     pub fn as_chunks_mut<const N: usize>(
-        &mut self,
+        self,
     ) -> (
-        VolatilePtr<[[T; N]], Access<R, W>>,
-        VolatilePtr<[T], Access<R, W>>,
+        VolatilePtr<'a, [[T; N]], Access<R, W>>,
+        VolatilePtr<'a, [T], Access<R, W>>,
     ) {
         assert_ne!(N, 0);
         let len = self.pointer.len() / N;
         let (multiple_of_n, remainder) = self.split_at_mut(len * N);
         // SAFETY: We already panicked for zero, and ensured by construction
         // that the length of the subslice is a multiple of N.
-        let array_slice = unsafe { multiple_of_n.as_chunks_unchecked_by_val() };
+        let array_slice = unsafe { multiple_of_n.as_chunks_unchecked_mut() };
         (array_slice, remainder)
     }
 
     pub unsafe fn as_chunks_unchecked_mut<const N: usize>(
-        &mut self,
-    ) -> VolatilePtr<[[T; N]], Access<R, W>> {
-        debug_assert_ne!(N, 0);
-        debug_assert_eq!(self.pointer.len() % N, 0);
-        let new_len =
-            // SAFETY: Our precondition is exactly what's needed to call this
-            unsafe { core::intrinsics::exact_div(self.pointer.len(), N) };
-        // SAFETY: We cast a slice of `new_len * N` elements into
-        // a slice of `new_len` many `N` elements chunks.
-        let pointer = NonNull::new(ptr::slice_from_raw_parts_mut(
-            self.pointer.as_mut_ptr().cast(),
-            new_len,
-        ))
-        .unwrap();
-        unsafe { VolatilePtr::new_generic(pointer) }
-    }
-
-    pub unsafe fn as_chunks_unchecked_by_val<const N: usize>(
         self,
     ) -> VolatilePtr<'a, [[T; N]], Access<R, W>> {
         debug_assert_ne!(N, 0);
@@ -797,7 +847,7 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
 
 /// Methods for volatile byte slices
 #[cfg(feature = "unstable")]
-impl<A> VolatilePtr<'_, [u8], A> {
+impl<R, W> VolatilePtr<'_, [u8], Access<R, W>> {
     /// Sets all elements of the byte slice to the given `value` using a volatile `memset`.
     ///
     /// This method is similar to the `slice::fill` method of the standard library, with the
@@ -815,11 +865,15 @@ impl<A> VolatilePtr<'_, [u8], A> {
     /// use volatile::VolatilePtr;
     /// use core::ptr::NonNull;
     ///
-    /// let mut buf = unsafe { VolatilePtr::new_read_write(NonNull::from(vec![0; 10].as_mut_slice())) };
+    /// let mut vec = vec![0; 10];
+    /// let mut buf = unsafe { VolatilePtr::new_read_write(NonNull::from(vec.as_mut_slice())) };
     /// buf.fill(1);
     /// assert_eq!(unsafe { buf.as_ptr().as_mut() }, &mut vec![1; 10]);
     /// ```
-    pub fn fill(&mut self, value: u8) {
+    pub fn fill(&mut self, value: u8)
+    where
+        W: access::Safe,
+    {
         unsafe {
             intrinsics::volatile_set_memory(self.pointer.as_mut_ptr(), value, self.pointer.len());
         }
@@ -831,7 +885,7 @@ impl<A> VolatilePtr<'_, [u8], A> {
 /// These methods are only available with the `unstable` feature enabled (requires a nightly
 /// Rust compiler).
 #[cfg(feature = "unstable")]
-impl<T, R, W, const N: usize> VolatilePtr<'_, [T; N], Access<R, W>> {
+impl<'a, T, R, W, const N: usize> VolatilePtr<'a, [T; N], Access<R, W>> {
     /// Converts an array reference to a shared slice.
     ///
     /// This makes it possible to use the methods defined on slices.
@@ -856,9 +910,41 @@ impl<T, R, W, const N: usize> VolatilePtr<'_, [T; N], Access<R, W>> {
     ///
     /// assert_eq!(dst, [1, 2]);
     /// ```
-    pub fn as_slice(&self) -> VolatilePtr<[T], Access<R, access::NoAccess>> {
+    pub fn as_slice(self) -> VolatilePtr<'a, [T], Access<R, access::NoAccess>> {
         unsafe {
             self.map(|array| {
+                NonNull::new(ptr::slice_from_raw_parts_mut(array.as_ptr() as *mut T, N)).unwrap()
+            })
+        }
+    }
+
+    /// Converts an array reference to a shared slice.
+    ///
+    /// This makes it possible to use the methods defined on slices.
+    ///
+    /// ## Example
+    ///
+    /// Copying two elements into a volatile array reference using `copy_from_slice`:
+    ///
+    /// ```
+    /// # extern crate core;
+    /// use volatile::VolatilePtr;
+    /// use core::ptr::NonNull;
+    ///
+    /// let src = [1, 2];
+    /// let mut dst = [0, 0];
+    /// let mut volatile = unsafe { VolatilePtr::new_write_only(NonNull::from(&dst)) };
+    ///
+    /// // convert the `Volatile<[i32; 2]>` array reference to a `Volatile<[i32]>` slice
+    /// let mut volatile_slice = volatile.as_slice_mut();
+    /// // we can now use the slice methods
+    /// volatile_slice.copy_from_slice(&src);
+    ///
+    /// assert_eq!(dst, [1, 2]);
+    /// ```
+    pub fn as_slice_mut(self) -> VolatilePtr<'a, [T], Access<R, W>> {
+        unsafe {
+            self.map_mut(|array| {
                 NonNull::new(ptr::slice_from_raw_parts_mut(array.as_ptr() as *mut T, N)).unwrap()
             })
         }

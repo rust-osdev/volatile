@@ -138,7 +138,9 @@ fn test_struct() {
     };
     let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut val)) };
     unsafe {
-        volatile.map_mut(|s| NonNull::new(core::ptr::addr_of_mut!((*s.as_ptr()).field_1)).unwrap())
+        volatile
+            .borrow_mut()
+            .map_mut(|s| NonNull::new(core::ptr::addr_of_mut!((*s.as_ptr()).field_1)).unwrap())
     }
     .update(|v| *v += 1);
     let mut field_2 = unsafe {
@@ -168,7 +170,8 @@ fn test_struct_macro() {
         field_2: true,
     };
     let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut val)) };
-    let mut field_1 = map_field_mut!(volatile.field_1);
+    let volatile_borrowed = volatile.borrow_mut();
+    let mut field_1 = map_field_mut!(volatile_borrowed.field_1);
     field_1.update(|v| *v += 1);
     let mut field_2 = map_field_mut!(volatile.field_2);
     assert!(field_2.read());
@@ -187,7 +190,7 @@ fn test_struct_macro() {
 fn test_slice() {
     let val: &mut [u32] = &mut [1, 2, 3];
     let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
-    volatile.index_mut(0).update(|v| *v += 1);
+    volatile.borrow_mut().index_mut(0).update(|v| *v += 1);
 
     let mut dst = [0; 3];
     volatile.copy_into_slice(&mut dst);
@@ -199,7 +202,7 @@ fn test_slice() {
 #[should_panic]
 fn test_bounds_check_1() {
     let val: &mut [u32] = &mut [1, 2, 3];
-    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
+    let volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
     volatile.index_mut(3);
 }
 
@@ -208,7 +211,7 @@ fn test_bounds_check_1() {
 #[should_panic]
 fn test_bounds_check_2() {
     let val: &mut [u32] = &mut [1, 2, 3];
-    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
+    let volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
     volatile.index_mut(2..1);
 }
 
@@ -217,7 +220,7 @@ fn test_bounds_check_2() {
 #[should_panic]
 fn test_bounds_check_3() {
     let val: &mut [u32] = &mut [1, 2, 3];
-    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
+    let volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
     volatile.index_mut(4..); // `3..` is is still ok (see next test)
 }
 
@@ -225,7 +228,7 @@ fn test_bounds_check_3() {
 #[test]
 fn test_bounds_check_4() {
     let val: &mut [u32] = &mut [1, 2, 3];
-    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
+    let volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
     assert_eq!(volatile.index_mut(3..).len(), 0);
 }
 
@@ -234,7 +237,7 @@ fn test_bounds_check_4() {
 #[should_panic]
 fn test_bounds_check_5() {
     let val: &mut [u32] = &mut [1, 2, 3];
-    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
+    let volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
     volatile.index_mut(..4);
 }
 
@@ -242,10 +245,10 @@ fn test_bounds_check_5() {
 #[test]
 fn test_chunks() {
     let val: &mut [u32] = &mut [1, 2, 3, 4, 5, 6];
-    let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
+    let volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(val)) };
     let mut chunks = volatile.as_chunks_mut().0;
-    chunks.index_mut(1).write([10, 11, 12]);
-    assert_eq!(chunks.index(0).read(), [1, 2, 3]);
+    chunks.borrow_mut().index_mut(1).write([10, 11, 12]);
+    assert_eq!(chunks.borrow().index(0).read(), [1, 2, 3]);
     assert_eq!(chunks.index(1).read(), [10, 11, 12]);
 }
 
