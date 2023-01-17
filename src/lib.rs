@@ -19,5 +19,6 @@ pub use ptr_copy::VolatilePtrCopy;
 
 pub mod access;
 mod cell;
+mod macros;
 mod ptr;
 mod ptr_copy;
