@@ -21,7 +21,7 @@
 
 use crate::{
     access::{Access, ReadOnly, ReadWrite, Readable, Writable},
-    ptr::VolatilePtr,
+    ptr_send::VolatilePtr,
 };
 use core::{cell::UnsafeCell, fmt, marker::PhantomData, ptr::NonNull};
 
