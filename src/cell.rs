@@ -19,8 +19,11 @@
 // ! and then perform operations on the pointer as usual in a volatile way. This method works as all
 // ! of the volatile wrapper types are the same size as their contained values.
 
-use crate::access::{Access, ReadWrite, Readable, Writable};
-use core::{fmt, marker::PhantomData, ptr};
+use crate::{
+    access::{Access, ReadOnly, ReadWrite, Readable, Writable},
+    ptr::VolatilePtr,
+};
+use core::{fmt, marker::PhantomData};
 
 /// A wrapper type around a volatile variable, which allows for volatile reads and writes
 /// to the contained value. The stored type needs to be `Copy`, as volatile reads and writes
@@ -115,6 +118,16 @@ impl<T: Copy, A: Access> VolatileCell<T, A> {
 
     pub fn access(&self) -> A {
         A::default()
+    }
+
+    pub fn as_ptr(&self) -> VolatilePtr<T, ReadOnly> {
+        // UNSAFE: Safe, as we know that our internal value exists.
+        unsafe { VolatilePtr::new_restricted(ReadOnly, (&self.value).into()) }
+    }
+
+    pub fn as_mut_ptr(&mut self) -> VolatilePtr<T, A> {
+        // UNSAFE: Safe, as we know that our internal value exists.
+        unsafe { VolatilePtr::new_restricted(A::default(), (&mut self.value).into()) }
     }
 }
 
