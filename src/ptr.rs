@@ -960,6 +960,9 @@ impl<'a, T, A, const N: usize> VolatilePtr<'a, [T; N], A> {
     }
 }
 
+unsafe impl<T, A> Send for VolatilePtr<'_, T, A> where T: Sync {}
+unsafe impl<T, A> Sync for VolatilePtr<'_, T, A> where T: Sync {}
+
 impl<T, A> fmt::Debug for VolatilePtr<'_, T, A>
 where
     T: Copy + fmt::Debug + ?Sized,
