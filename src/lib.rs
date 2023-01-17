@@ -13,10 +13,12 @@
 #![warn(missing_docs)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
+pub use cell::VolatileCell;
 pub use ptr_copy::VolatilePtrCopy;
 pub use ptr_send::VolatilePtr;
 
 pub mod access;
+mod cell;
 mod macros;
 mod ptr_copy;
 mod ptr_send;
