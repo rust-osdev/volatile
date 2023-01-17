@@ -15,7 +15,9 @@
 
 pub use cell::VolatileCell;
 pub use ptr::VolatilePtr;
+pub use ptr_copy::VolatilePtrCopy;
 
 pub mod access;
 mod cell;
 mod ptr;
+mod ptr_copy;
