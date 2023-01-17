@@ -23,7 +23,7 @@ use crate::{
     access::{Access, ReadOnly, ReadWrite, Readable, Writable},
     ptr::VolatilePtr,
 };
-use core::{fmt, marker::PhantomData};
+use core::{cell::UnsafeCell, fmt, marker::PhantomData, ptr::NonNull};
 
 /// A wrapper type around a volatile variable, which allows for volatile reads and writes
 /// to the contained value. The stored type needs to be `Copy`, as volatile reads and writes
@@ -42,7 +42,7 @@ use core::{fmt, marker::PhantomData};
 #[derive(Default)]
 #[repr(transparent)]
 pub struct VolatileCell<T, A = ReadWrite> {
-    value: T,
+    value: UnsafeCell<T>,
     access: PhantomData<A>,
 }
 
@@ -111,7 +111,7 @@ impl<T: Copy, A: Access> VolatileCell<T, A> {
     pub const fn new_restricted(access: A, value: T) -> Self {
         let _ = access;
         VolatileCell {
-            value,
+            value: UnsafeCell::new(value),
             access: PhantomData,
         }
     }
@@ -122,12 +122,14 @@ impl<T: Copy, A: Access> VolatileCell<T, A> {
 
     pub fn as_ptr(&self) -> VolatilePtr<T, ReadOnly> {
         // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { VolatilePtr::new_restricted(ReadOnly, (&self.value).into()) }
+        unsafe { VolatilePtr::new_restricted(ReadOnly, NonNull::new_unchecked(self.value.get())) }
     }
 
     pub fn as_mut_ptr(&mut self) -> VolatilePtr<T, A> {
         // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { VolatilePtr::new_restricted(A::default(), (&mut self.value).into()) }
+        unsafe {
+            VolatilePtr::new_restricted(A::default(), NonNull::new_unchecked(self.value.get()))
+        }
     }
 }
 
@@ -242,14 +244,14 @@ mod tests {
     fn test_write() {
         let mut volatile = VolatileCell::new(42);
         volatile.write(50);
-        assert_eq!(volatile.value, 50);
+        assert_eq!(unsafe { *volatile.value.get_mut() }, 50);
     }
 
     #[test]
     fn test_update() {
         let mut volatile = VolatileCell::new(42);
         volatile.update(|v| v + 1);
-        assert_eq!(volatile.value, 43);
+        assert_eq!(volatile.read(), 43);
     }
 
     #[test]
