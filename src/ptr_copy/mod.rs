@@ -13,6 +13,8 @@ use core::{
 
 use crate::access::{Access, ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
 
+#[cfg(test)]
+mod tests;
 #[cfg(feature = "unstable")]
 mod unstable;
 #[cfg(feature = "very_unstable")]
