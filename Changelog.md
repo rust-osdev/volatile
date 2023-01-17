@@ -1,5 +1,7 @@
 # Unreleased
 
+# 0.4.6 – 2023-01-17
+
 - Fix UB in slice methods when Deref returns different references ([#27](https://github.com/rust-osdev/volatile/pull/27))
 
 # 0.4.5 – 2022-04-24
