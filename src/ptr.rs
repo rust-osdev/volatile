@@ -287,8 +287,11 @@ where
     T: ?Sized,
 {
     // TODO: Add documentation
-    pub fn borrow(&self) -> VolatilePtr<T, ReadOnly> {
-        unsafe { VolatilePtr::new_restricted(ReadOnly, self.pointer) }
+    pub fn borrow(&self) -> VolatilePtr<T, A::RestrictShared>
+    where
+        A: Access,
+    {
+        unsafe { VolatilePtr::new_restricted(Default::default(), self.pointer) }
     }
 
     // TODO: Add documentation
@@ -345,7 +348,7 @@ where
         F: FnOnce(NonNull<T>) -> NonNull<U>,
         U: ?Sized,
     {
-        unsafe { VolatilePtr::new_restricted(ReadOnly, f(self.pointer)) }
+        unsafe { VolatilePtr::new_restricted(Default::default(), f(self.pointer)) }
     }
 
     #[cfg(feature = "very_unstable")]
