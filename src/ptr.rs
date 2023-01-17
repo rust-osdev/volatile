@@ -27,7 +27,6 @@ use crate::access::{Access, ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
 /// Accessing a struct field:
 ///
 /// ```
-/// # extern crate core;
 /// use volatile::{VolatilePtr, map_field};
 /// use core::ptr::NonNull;
 ///
@@ -42,7 +41,6 @@ use crate::access::{Access, ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
 ///
 /// Creating `VolatilePtr`s to unaligned field in packed structs is not allowed:
 /// ```compile_fail
-/// # extern crate core;
 /// use volatile::{VolatilePtr, map_field};
 /// use core::ptr::NonNull;
 ///
@@ -171,7 +169,6 @@ where
     /// ## Examples
     ///
     /// ```rust
-    /// # extern crate core;
     /// use volatile::VolatilePtr;
     /// use core::ptr::NonNull;
     ///
@@ -200,7 +197,6 @@ where
     /// ## Example
     ///
     /// ```rust
-    /// # extern crate core;
     /// use volatile::VolatilePtr;
     /// use core::ptr::NonNull;
     ///
@@ -225,7 +221,6 @@ where
     /// the contained value.
     ///
     /// ```rust
-    /// # extern crate core;
     /// use volatile::VolatilePtr;
     /// use core::ptr::NonNull;
     ///
@@ -265,7 +260,6 @@ where
     /// ## Example
     ///
     /// ```
-    /// # extern crate core;
     /// use volatile::VolatilePtr;
     /// use core::ptr::NonNull;
     ///
@@ -313,7 +307,6 @@ where
     /// Accessing a struct field:
     ///
     /// ```
-    /// # extern crate core;
     /// use volatile::VolatilePtr;
     /// use core::ptr::NonNull;
     ///
@@ -329,7 +322,6 @@ where
     /// Don't misuse this method to do a non-volatile read of the referenced value:
     ///
     /// ```
-    /// # extern crate core;
     /// use volatile::VolatilePtr;
     /// use core::ptr::NonNull;
     ///
@@ -406,7 +398,6 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     /// Accessing a single slice element:
     ///
     /// ```
-    /// # extern crate core;
     /// use volatile::VolatilePtr;
     /// use core::ptr::NonNull;
     ///
@@ -419,7 +410,6 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     /// Accessing a subslice:
     ///
     /// ```
-    /// # extern crate core;
     /// use volatile::VolatilePtr;
     /// use core::ptr::NonNull;
     ///
@@ -508,7 +498,6 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     /// Copying two elements from a volatile slice:
     ///
     /// ```
-    /// # extern crate core;
     /// use volatile::VolatilePtr;
     /// use core::ptr::NonNull;
     ///
@@ -565,7 +554,6 @@ impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
     /// Copying two elements from a slice into a volatile slice:
     ///
     /// ```
-    /// # extern crate core;
     /// use volatile::VolatilePtr;
     /// use core::ptr::NonNull;
     ///
@@ -813,7 +801,6 @@ impl<R, W> VolatilePtr<'_, [u8], Access<R, W>> {
     /// ## Example
     ///
     /// ```rust
-    /// # extern crate core;
     /// use volatile::VolatilePtr;
     /// use core::ptr::NonNull;
     ///
@@ -847,7 +834,6 @@ impl<'a, T, R, W, const N: usize> VolatilePtr<'a, [T; N], Access<R, W>> {
     /// Copying two elements from a volatile array reference using `copy_into_slice`:
     ///
     /// ```
-    /// # extern crate core;
     /// use volatile::VolatilePtr;
     /// use core::ptr::NonNull;
     ///
@@ -879,7 +865,6 @@ impl<'a, T, R, W, const N: usize> VolatilePtr<'a, [T; N], Access<R, W>> {
     /// Copying two elements into a volatile array reference using `copy_from_slice`:
     ///
     /// ```
-    /// # extern crate core;
     /// use volatile::VolatilePtr;
     /// use core::ptr::NonNull;
     ///
