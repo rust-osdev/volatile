@@ -12,6 +12,8 @@ use core::{
     ptr::{self, NonNull},
 };
 
+#[cfg(test)]
+mod tests;
 #[cfg(feature = "unstable")]
 mod unstable;
 #[cfg(feature = "very_unstable")]
