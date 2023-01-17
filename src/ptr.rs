@@ -362,6 +362,54 @@ where
     }
 }
 
+/// Methods for restricting access.
+impl<'a, T> VolatilePtr<'a, T, ReadWrite>
+where
+    T: ?Sized,
+{
+    /// Restricts access permissions to read-only.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use volatile::VolatilePtr;
+    /// use core::ptr::NonNull;
+    ///
+    /// let mut value: i16 = -4;
+    /// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
+    ///
+    /// let read_only = volatile.read_only();
+    /// assert_eq!(read_only.read(), -4);
+    /// // read_only.write(10); // compile-time error
+    /// ```
+    pub fn read_only(self) -> VolatilePtr<'a, T, ReadOnly> {
+        unsafe { VolatilePtr::new_restricted(ReadOnly, self.pointer) }
+    }
+
+    /// Restricts access permissions to write-only.
+    ///
+    /// ## Example
+    ///
+    /// Creating a write-only reference to a struct field:
+    ///
+    /// ```
+    /// use volatile::{VolatilePtr, map_field_mut};
+    /// use core::ptr::NonNull;
+    ///
+    /// struct Example { field_1: u32, field_2: u8, }
+    /// let mut value = Example { field_1: 15, field_2: 255 };
+    /// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
+    ///
+    /// // construct a volatile write-only reference to `field_2`
+    /// let mut field_2 = map_field_mut!(volatile.field_2).write_only();
+    /// field_2.write(14);
+    /// // field_2.read(); // compile-time error
+    /// ```
+    pub fn write_only(self) -> VolatilePtr<'a, T, WriteOnly> {
+        unsafe { VolatilePtr::new_restricted(WriteOnly, self.pointer) }
+    }
+}
+
 /// Methods for volatile slices
 #[cfg(feature = "unstable")]
 impl<'a, T, R, W> VolatilePtr<'a, [T], Access<R, W>> {
@@ -873,56 +921,6 @@ impl<'a, T, R, W, const N: usize> VolatilePtr<'a, [T; N], Access<R, W>> {
                 NonNull::new(ptr::slice_from_raw_parts_mut(array.as_ptr() as *mut T, N)).unwrap()
             })
         }
-    }
-}
-
-/// Methods for restricting access.
-impl<'a, T> VolatilePtr<'a, T, ReadWrite>
-where
-    T: ?Sized,
-{
-    /// Restricts access permissions to read-only.
-    ///
-    /// ## Example
-    ///
-    /// ```
-    /// # extern crate core;
-    /// use volatile::VolatilePtr;
-    /// use core::ptr::NonNull;
-    ///
-    /// let mut value: i16 = -4;
-    /// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
-    ///
-    /// let read_only = volatile.read_only();
-    /// assert_eq!(read_only.read(), -4);
-    /// // read_only.write(10); // compile-time error
-    /// ```
-    pub fn read_only(self) -> VolatilePtr<'a, T, ReadOnly> {
-        unsafe { VolatilePtr::new_restricted(ReadOnly, self.pointer) }
-    }
-
-    /// Restricts access permissions to write-only.
-    ///
-    /// ## Example
-    ///
-    /// Creating a write-only reference to a struct field:
-    ///
-    /// ```
-    /// # extern crate core;
-    /// use volatile::{VolatilePtr, map_field_mut};
-    /// use core::ptr::NonNull;
-    ///
-    /// struct Example { field_1: u32, field_2: u8, }
-    /// let mut value = Example { field_1: 15, field_2: 255 };
-    /// let mut volatile = unsafe { VolatilePtr::new_read_write(NonNull::from(&mut value)) };
-    ///
-    /// // construct a volatile write-only reference to `field_2`
-    /// let mut field_2 = map_field_mut!(volatile.field_2).write_only();
-    /// field_2.write(14);
-    /// // field_2.read(); // compile-time error
-    /// ```
-    pub fn write_only(self) -> VolatilePtr<'a, T, WriteOnly> {
-        unsafe { VolatilePtr::new_restricted(WriteOnly, self.pointer) }
     }
 }
 
