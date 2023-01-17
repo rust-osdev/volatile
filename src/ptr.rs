@@ -140,11 +140,7 @@ where
         A: Access,
     {
         let _ = access;
-        VolatilePtr {
-            pointer,
-            reference: PhantomData,
-            access: PhantomData,
-        }
+        unsafe { Self::new_generic(pointer) }
     }
 
     pub fn from_ref(reference: &'a T) -> VolatilePtr<'a, T, ReadOnly>
@@ -152,6 +148,14 @@ where
         T: 'a,
     {
         unsafe { VolatilePtr::new_restricted(ReadOnly, reference.into()) }
+    }
+
+    const unsafe fn new_generic<A>(pointer: NonNull<T>) -> VolatilePtr<'a, T, A> {
+        VolatilePtr {
+            pointer,
+            reference: PhantomData,
+            access: PhantomData,
+        }
     }
 }
 
