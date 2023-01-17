@@ -254,7 +254,7 @@ mod tests {
     fn test_write() {
         let mut volatile = VolatileCell::new(42);
         volatile.write(50);
-        assert_eq!(unsafe { *volatile.value.get_mut() }, 50);
+        assert_eq!(*volatile.value.get_mut(), 50);
     }
 
     #[test]
