@@ -147,8 +147,7 @@ impl<T: Copy, A> VolatileCell<T, A> {
     where
         A: Readable,
     {
-        // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { ptr::read_volatile(&self.value) }
+        self.as_ptr().read()
     }
 
     /// Performs a volatile write, setting the contained value to the given value `value`. Volatile
@@ -167,8 +166,7 @@ impl<T: Copy, A> VolatileCell<T, A> {
     where
         A: Writable,
     {
-        // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { ptr::write_volatile(&mut self.value, value) };
+        self.as_mut_ptr().write(value)
     }
 
     /// Performs a volatile read of the contained value, passes a mutable reference to it to the
