@@ -46,7 +46,7 @@ pub struct VolatileCell<T, A = ReadWrite> {
     access: PhantomData<A>,
 }
 
-impl<T: Copy> VolatileCell<T> {
+impl<T> VolatileCell<T> {
     /// Construct a new volatile cell wrapping the given value.
     ///
     /// The returned cell allows read and write operations. Use
@@ -71,9 +71,7 @@ impl<T: Copy> VolatileCell<T> {
     pub const fn new(value: T) -> Self {
         VolatileCell::new_restricted(ReadWrite, value)
     }
-}
 
-impl<T: Copy, A: Access> VolatileCell<T, A> {
     /// Construct a new volatile cell with restricted access, wrapping the given value.
     ///
     /// ## Examples
@@ -108,15 +106,23 @@ impl<T: Copy, A: Access> VolatileCell<T, A> {
     /// read_only.write(5); // -> compile error
     /// read_only.update(|v| v + 1); // -> compile error
     /// ```
-    pub const fn new_restricted(access: A, value: T) -> Self {
+    pub const fn new_restricted<A>(access: A, value: T) -> VolatileCell<T, A>
+    where
+        A: Access,
+    {
         let _ = access;
         VolatileCell {
             value: UnsafeCell::new(value),
             access: PhantomData,
         }
     }
+}
 
-    pub fn access(&self) -> A {
+impl<T, A> VolatileCell<T, A> {
+    pub fn access(&self) -> A
+    where
+        A: Access,
+    {
         A::default()
     }
 
@@ -125,15 +131,16 @@ impl<T: Copy, A: Access> VolatileCell<T, A> {
         unsafe { VolatilePtr::new_restricted(ReadOnly, NonNull::new_unchecked(self.value.get())) }
     }
 
-    pub fn as_mut_ptr(&mut self) -> VolatilePtr<T, A> {
+    pub fn as_mut_ptr(&mut self) -> VolatilePtr<T, A>
+    where
+        A: Access,
+    {
         // UNSAFE: Safe, as we know that our internal value exists.
         unsafe {
             VolatilePtr::new_restricted(A::default(), NonNull::new_unchecked(self.value.get()))
         }
     }
-}
 
-impl<T: Copy, A> VolatileCell<T, A> {
     /// Performs a volatile read of the contained value, returning a copy
     /// of the read value. Volatile reads are guaranteed not to be optimized
     /// away by the compiler, but by themselves do not have atomic ordering
@@ -148,6 +155,7 @@ impl<T: Copy, A> VolatileCell<T, A> {
     pub fn read(&self) -> T
     where
         A: Readable,
+        T: Copy,
     {
         self.as_ptr().read()
     }
@@ -167,6 +175,7 @@ impl<T: Copy, A> VolatileCell<T, A> {
     pub fn write(&mut self, value: T)
     where
         A: Writable,
+        T: Copy,
     {
         self.as_mut_ptr().write(value)
     }
@@ -186,6 +195,7 @@ impl<T: Copy, A> VolatileCell<T, A> {
     where
         F: FnOnce(T) -> T,
         A: Readable + Writable,
+        T: Copy,
     {
         let new = f(self.read());
         self.write(new);
