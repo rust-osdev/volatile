@@ -8,7 +8,6 @@
 use core::{
     fmt,
     marker::PhantomData,
-    mem,
     ptr::{self, NonNull},
 };
 #[cfg(feature = "unstable")]
