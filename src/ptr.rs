@@ -112,7 +112,12 @@ where
     access: PhantomData<A>,
 }
 
-impl<'a, T> VolatilePtr<'a, T, ReadWrite>
+/// Constructor functions.
+///
+/// These functions construct new `VolatilePtr` values. While the `new`
+/// function creates a `VolatilePtr` instance with unrestricted access, there
+/// are also functions for creating read-only or write-only instances.
+impl<'a, T> VolatilePtr<'a, T>
 where
     T: ?Sized,
 {
@@ -126,14 +131,11 @@ where
     {
         unsafe { VolatilePtr::new(reference.into()) }
     }
-}
 
-impl<T, A> VolatilePtr<'_, T, A>
-where
-    A: Access,
-    T: ?Sized,
-{
-    pub const unsafe fn new_restricted(access: A, pointer: NonNull<T>) -> Self {
+    pub const unsafe fn new_restricted<A>(access: A, pointer: NonNull<T>) -> VolatilePtr<'a, T, A>
+    where
+        A: Access,
+    {
         let _ = access;
         VolatilePtr {
             pointer,
@@ -141,12 +143,8 @@ where
             access: PhantomData,
         }
     }
-}
-impl<'a, T> VolatilePtr<'a, T, ReadOnly>
-where
-    T: ?Sized,
-{
-    pub fn from_ref(reference: &'a T) -> Self
+
+    pub fn from_ref(reference: &'a T) -> VolatilePtr<'a, T, ReadOnly>
     where
         T: 'a,
     {
@@ -154,10 +152,9 @@ where
     }
 }
 
-/// Methods for references to `Copy` types
-impl<T, A> VolatilePtr<'_, T, A>
+impl<'a, T, A> VolatilePtr<'a, T, A>
 where
-    T: Copy + ?Sized,
+    T: ?Sized,
 {
     /// Performs a volatile read of the contained value.
     ///
@@ -182,6 +179,7 @@ where
     /// ```
     pub fn read(&self) -> T
     where
+        T: Copy,
         A: Readable,
     {
         // UNSAFE: Safe, as ... TODO
@@ -208,6 +206,7 @@ where
     /// ```
     pub fn write(&mut self, value: T)
     where
+        T: Copy,
         A: Writable,
     {
         // UNSAFE: Safe, as ... TODO
@@ -232,19 +231,14 @@ where
     /// ```
     pub fn update<F>(&mut self, f: F)
     where
+        T: Copy,
         A: Readable + Writable,
         F: FnOnce(T) -> T,
     {
         let new = f(self.read());
         self.write(new);
     }
-}
 
-/// Method for extracting the wrapped value.
-impl<T, A> VolatilePtr<'_, T, A>
-where
-    T: ?Sized,
-{
     /// Extracts the inner value stored in the wrapper type.
     ///
     /// This method gives direct access to the wrapped reference and thus allows
@@ -273,13 +267,7 @@ where
     pub fn as_ptr(&self) -> NonNull<T> {
         self.pointer
     }
-}
 
-/// Transformation methods for accessing struct fields
-impl<'a, T, A> VolatilePtr<'a, T, A>
-where
-    T: ?Sized,
-{
     // TODO: Add documentation
     pub fn borrow(&self) -> VolatilePtr<T, A::RestrictShared>
     where
