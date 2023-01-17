@@ -16,8 +16,7 @@ use access::{ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
 use core::{
     fmt,
     marker::PhantomData,
-    ops::Deref,
-    ops::{DerefMut, Index, IndexMut},
+    ops::{Deref, DerefMut, Index, IndexMut},
     ptr,
     slice::SliceIndex,
 };
@@ -514,16 +513,17 @@ where
     where
         T: Copy,
     {
+        let src = self.reference.deref();
         assert_eq!(
-            self.reference.len(),
+            src.len(),
             dst.len(),
             "destination and source slices have different lengths"
         );
         unsafe {
             intrinsics::volatile_copy_nonoverlapping_memory(
                 dst.as_mut_ptr(),
-                self.reference.as_ptr(),
-                self.reference.len(),
+                src.as_ptr(),
+                src.len(),
             );
         }
     }
@@ -569,16 +569,17 @@ where
         T: Copy,
         R: DerefMut,
     {
+        let dest = self.reference.deref_mut();
         assert_eq!(
-            self.reference.len(),
+            dest.len(),
             src.len(),
             "destination and source slices have different lengths"
         );
         unsafe {
             intrinsics::volatile_copy_nonoverlapping_memory(
-                self.reference.as_mut_ptr(),
+                dest.as_mut_ptr(),
                 src.as_ptr(),
-                self.reference.len(),
+                dest.len(),
             );
         }
     }
@@ -621,22 +622,20 @@ where
         T: Copy,
         R: DerefMut,
     {
+        let slice = self.reference.deref_mut();
         // implementation taken from https://github.com/rust-lang/rust/blob/683d1bcd405727fcc9209f64845bd3b9104878b8/library/core/src/slice/mod.rs#L2726-L2738
         let Range {
             start: src_start,
             end: src_end,
-        } = range(src, ..self.reference.len());
+        } = range(src, ..slice.len());
         let count = src_end - src_start;
-        assert!(
-            dest <= self.reference.len() - count,
-            "dest is out of bounds"
-        );
+        assert!(dest <= slice.len() - count, "dest is out of bounds");
         // SAFETY: the conditions for `volatile_copy_memory` have all been checked above,
         // as have those for `ptr::add`.
         unsafe {
             intrinsics::volatile_copy_memory(
-                self.reference.as_mut_ptr().add(dest),
-                self.reference.as_ptr().add(src_start),
+                slice.as_mut_ptr().add(dest),
+                slice.as_ptr().add(src_start),
                 count,
             );
         }
@@ -672,12 +671,9 @@ where
     where
         R: DerefMut,
     {
+        let dest = self.reference.deref_mut();
         unsafe {
-            intrinsics::volatile_set_memory(
-                self.reference.as_mut_ptr(),
-                value,
-                self.reference.len(),
-            );
+            intrinsics::volatile_set_memory(dest.as_mut_ptr(), value, dest.len());
         }
     }
 }
