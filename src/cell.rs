@@ -128,7 +128,12 @@ impl<T, A> VolatileCell<T, A> {
 
     pub fn as_ptr(&self) -> VolatilePtr<T, ReadOnly> {
         // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe { VolatilePtr::new_restricted(ReadOnly, NonNull::new_unchecked(self.value.get())) }
+        unsafe {
+            VolatilePtr::new_restricted(
+                ReadOnly,
+                NonNull::new_unchecked(UnsafeCell::raw_get(&self.value)),
+            )
+        }
     }
 
     pub fn as_mut_ptr(&mut self) -> VolatilePtr<T, A>
@@ -137,7 +142,10 @@ impl<T, A> VolatileCell<T, A> {
     {
         // UNSAFE: Safe, as we know that our internal value exists.
         unsafe {
-            VolatilePtr::new_restricted(A::default(), NonNull::new_unchecked(self.value.get()))
+            VolatilePtr::new_restricted(
+                A::default(),
+                NonNull::new_unchecked(UnsafeCell::raw_get(&self.value)),
+            )
         }
     }
 
