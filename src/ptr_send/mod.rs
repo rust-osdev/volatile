@@ -5,12 +5,11 @@
 //! The wrapper types *do not* enforce any atomicity guarantees; to also get atomicity, consider
 //! looking at the `Atomic` wrapper types found in `libcore` or `libstd`.
 
-use crate::access::{Access, ReadOnly, ReadWrite, Readable, Writable, WriteOnly};
-use core::{
-    fmt,
-    marker::PhantomData,
-    ptr::{self, NonNull},
+use crate::{
+    access::{Access, ReadOnly, ReadWrite, Readable, Writable, WriteOnly},
+    ptr_copy,
 };
+use core::{fmt, marker::PhantomData, ptr::NonNull};
 
 #[cfg(test)]
 mod tests;
@@ -121,8 +120,7 @@ where
         T: Copy,
         A: Readable,
     {
-        // UNSAFE: Safe, as ... TODO
-        unsafe { ptr::read_volatile(self.pointer.as_ptr()) }
+        self.as_ref().read()
     }
 
     /// Performs a volatile write, setting the contained value to the given `value`.
@@ -148,8 +146,7 @@ where
         T: Copy,
         A: Writable,
     {
-        // UNSAFE: Safe, as ... TODO
-        unsafe { ptr::write_volatile(self.pointer.as_ptr(), value) };
+        self.as_mut().write(value)
     }
 
     /// Updates the contained value using the given closure and volatile instructions.
@@ -174,8 +171,7 @@ where
         A: Readable + Writable,
         F: FnOnce(T) -> T,
     {
-        let new = f(self.read());
-        self.write(new);
+        self.as_mut().update(f);
     }
 
     /// Extracts the inner value stored in the wrapper type.
@@ -278,6 +274,20 @@ where
         A: Access,
     {
         unsafe { VolatilePtr::new_restricted(A::default(), f(self.pointer)) }
+    }
+
+    pub fn as_ref<'b>(&'b self) -> ptr_copy::VolatilePtrCopy<'b, T, A::RestrictShared>
+    where
+        A: Access,
+    {
+        unsafe { ptr_copy::VolatilePtrCopy::new_restricted(Default::default(), self.pointer) }
+    }
+
+    pub fn as_mut<'b>(&'b mut self) -> ptr_copy::VolatilePtrCopy<'b, T, A>
+    where
+        A: Access,
+    {
+        unsafe { ptr_copy::VolatilePtrCopy::new_restricted(Default::default(), self.pointer) }
     }
 }
 
