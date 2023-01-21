@@ -20,7 +20,7 @@
 // ! of the volatile wrapper types are the same size as their contained values.
 
 use crate::{
-    access::{Access, ReadOnly, ReadWrite, Readable, Writable},
+    access::{Access, ReadWrite, Readable, Writable},
     ptr_send::VolatilePtr,
 };
 use core::{cell::UnsafeCell, fmt, marker::PhantomData, ptr::NonNull};
@@ -39,6 +39,26 @@ use core::{cell::UnsafeCell, fmt, marker::PhantomData, ptr::NonNull};
 /// use the [`core::sync::atomic`] module.
 ///
 /// The size of this struct is the same as the size of the contained type.
+///
+/// ## Examples
+///
+/// `VolatileCell` allows writes through shared references, so it's not safe to share
+/// references across threads. For this reason, `VolatileCell` does not implement the
+/// [`Sync`] trait. As a result, you cannot use the type in statics without synchronization:
+///
+/// ```compile_fail
+/// # use volatile::VolatileCell;
+/// // error: VolatileCell is not Sync
+/// static FOO: &mut VolatileCell<u8> = todo!();
+/// ```
+///
+/// To use `VolatileCell` in a `static`, wrap it in some type that provides mutual exclusion:
+///
+/// ```
+/// use volatile::VolatileCell;
+/// use std::sync::Mutex;
+/// static FOO: Mutex<Option<&mut VolatileCell<u8>>> = Mutex::new(None);
+/// ```
 #[derive(Default)]
 #[repr(transparent)]
 pub struct VolatileCell<T, A = ReadWrite> {
@@ -126,17 +146,7 @@ impl<T, A> VolatileCell<T, A> {
         A::default()
     }
 
-    pub fn as_ptr(&self) -> VolatilePtr<T, ReadOnly> {
-        // UNSAFE: Safe, as we know that our internal value exists.
-        unsafe {
-            VolatilePtr::new_restricted(
-                ReadOnly,
-                NonNull::new_unchecked(UnsafeCell::raw_get(&self.value)),
-            )
-        }
-    }
-
-    pub fn as_mut_ptr(&mut self) -> VolatilePtr<T, A>
+    pub fn as_ptr(&self) -> VolatilePtr<T, A>
     where
         A: Access,
     {
@@ -180,12 +190,12 @@ impl<T, A> VolatileCell<T, A> {
     /// value.write(42u32);
     /// assert_eq!(value.read(), 42u32);
     /// ```
-    pub fn write(&mut self, value: T)
+    pub fn write(&self, value: T)
     where
         A: Writable,
         T: Copy,
     {
-        self.as_mut_ptr().write(value)
+        self.as_ptr().write(value)
     }
 
     /// Performs a volatile read of the contained value, passes a mutable reference to it to the
@@ -199,7 +209,7 @@ impl<T, A> VolatileCell<T, A> {
     /// value.update(|val| val * 2);
     /// assert_eq!(value.read(), 42u32);
     /// ```
-    pub fn update<F>(&mut self, f: F)
+    pub fn update<F>(&self, f: F)
     where
         F: FnOnce(T) -> T,
         A: Readable + Writable,
@@ -267,7 +277,7 @@ mod tests {
 
     #[test]
     fn test_update() {
-        let mut volatile = VolatileCell::new(42);
+        let volatile = VolatileCell::new(42);
         volatile.update(|v| v + 1);
         assert_eq!(volatile.read(), 43);
     }
