@@ -1,33 +1,33 @@
 use core::ptr::NonNull;
 
-use crate::{access::Access, VolatilePtrCopy};
+use crate::{access::Access, VolatilePtr};
 
-impl<'a, T, A> VolatilePtrCopy<'a, T, A>
+impl<'a, T, A> VolatilePtr<'a, T, A>
 where
     T: ?Sized,
 {
-    pub const unsafe fn map_const<F, U>(self, f: F) -> VolatilePtrCopy<'a, U, A::RestrictShared>
+    pub const unsafe fn map_const<F, U>(self, f: F) -> VolatilePtr<'a, U, A::RestrictShared>
     where
         F: ~const FnOnce(NonNull<T>) -> NonNull<U>,
         A: Access,
         U: ?Sized,
     {
-        unsafe { VolatilePtrCopy::new_generic(f(self.pointer)) }
+        unsafe { VolatilePtr::new_generic(f(self.pointer)) }
     }
 
-    pub const unsafe fn map_mut_const<F, U>(self, f: F) -> VolatilePtrCopy<'a, U, A>
+    pub const unsafe fn map_mut_const<F, U>(self, f: F) -> VolatilePtr<'a, U, A>
     where
         F: ~const FnOnce(NonNull<T>) -> NonNull<U>,
         U: ?Sized,
     {
-        unsafe { VolatilePtrCopy::new_generic(f(self.pointer)) }
+        unsafe { VolatilePtr::new_generic(f(self.pointer)) }
     }
 }
 
 /// Methods for volatile slices
 #[cfg(feature = "unstable")]
-impl<'a, T, A> VolatilePtrCopy<'a, [T], A> {
-    pub const fn index_const(self, index: usize) -> VolatilePtrCopy<'a, T, A::RestrictShared>
+impl<'a, T, A> VolatilePtr<'a, [T], A> {
+    pub const fn index_const(self, index: usize) -> VolatilePtr<'a, T, A::RestrictShared>
     where
         A: Access,
     {
@@ -47,7 +47,7 @@ impl<'a, T, A> VolatilePtrCopy<'a, [T], A> {
         unsafe { self.map_const(Mapper { index }) }
     }
 
-    pub const fn index_mut_const(self, index: usize) -> VolatilePtrCopy<'a, T, A> {
+    pub const fn index_mut_const(self, index: usize) -> VolatilePtr<'a, T, A> {
         assert!(index < self.pointer.len(), "index out of bounds");
 
         struct Mapper {

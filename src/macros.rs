@@ -10,7 +10,7 @@
 ///
 /// struct Example { field_1: u32, field_2: u8, }
 /// let mut value = Example { field_1: 15, field_2: 255 };
-/// let mut volatile = VolatilePtr::from_mut_ref(&mut value);
+/// let mut volatile = unsafe { VolatilePtr::new((&mut value).into()) };
 ///
 /// // construct a volatile reference to a field
 /// let field_2 = map_field!(volatile.field_2);
@@ -25,7 +25,7 @@
 /// #[repr(packed)]
 /// struct Example { field_1: u8, field_2: usize, }
 /// let mut value = Example { field_1: 15, field_2: 255 };
-/// let mut volatile = VolatilePtr::from_mut_ref(&mut value);
+/// let mut volatile = unsafe { VolatilePtr::new((&mut value).into()) };
 ///
 /// // Constructing a volatile reference to an unaligned field doesn't compile.
 /// let field_2 = map_field!(volatile.field_2);
@@ -38,7 +38,7 @@ macro_rules! map_field {
         // if statement will never be executed, so it can never cause any UB.
         if false {
             #[deny(unaligned_references)]
-            let _ref_to_field = &(unsafe { &*$volatile.as_ptr().as_ptr() }).$place;
+            let _ref_to_field = &(unsafe { &*$volatile.as_raw_ptr().as_ptr() }).$place;
         }
 
         unsafe {
@@ -56,8 +56,7 @@ macro_rules! map_field_mut {
         // sure that the field is not potentially unaligned. The body of the
         // if statement will never be executed, so it can never cause any UB.
         if false {
-            #[deny(unaligned_references)]
-            let _ref_to_field = &(unsafe { &*$volatile.as_ptr().as_ptr() }).$place;
+            let _ref_to_field = &(unsafe { &*$volatile.as_raw_ptr().as_ptr() }).$place;
         }
 
         unsafe {
