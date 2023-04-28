@@ -50,7 +50,7 @@ where
         unsafe { Self::new_generic(pointer) }
     }
 
-    const unsafe fn new_generic<A>(pointer: NonNull<T>) -> VolatilePtr<'a, T, A> {
+    pub(super) const unsafe fn new_generic<A>(pointer: NonNull<T>) -> VolatilePtr<'a, T, A> {
         VolatilePtr {
             pointer,
             reference: PhantomData,

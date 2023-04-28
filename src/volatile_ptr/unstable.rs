@@ -81,7 +81,7 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
     where
         A: Access,
     {
-        let ptr = self.as_ptr().as_ptr() as *mut T;
+        let ptr = self.as_raw_ptr().as_ptr() as *mut T;
         let len = self.len();
         (0..len)
             .map(move |i| unsafe { VolatilePtr::new_generic(NonNull::new_unchecked(ptr.add(i))) })
@@ -89,7 +89,7 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
 
     /// Returns an iterator that allows modifying each value.
     pub fn iter_mut(self) -> impl Iterator<Item = VolatilePtr<'a, T, A>> {
-        let ptr = self.as_ptr().as_ptr() as *mut T;
+        let ptr = self.as_raw_ptr().as_ptr() as *mut T;
         let len = self.len();
         (0..len)
             .map(move |i| unsafe { VolatilePtr::new_generic(NonNull::new_unchecked(ptr.add(i))) })
@@ -174,8 +174,8 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
     /// let mut dst = [0, 0];
     /// // the `Volatile` type does not work with arrays, so convert `dst` to a slice
     /// let slice = &mut dst[..];
-    /// let mut volatile = VolatilePtr::from_mut_ref(slice);
-    ///    /// // Because the slices have to be the same length,
+    /// let mut volatile = unsafe { VolatilePtr::new(NonNull::from(slice)) };
+    /// // Because the slices have to be the same length,
     /// // we slice the source slice from four elements
     /// // to two. It will panic if we don't do this.
     /// volatile.copy_from_slice(&src[2..]);
@@ -232,7 +232,7 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
     ///
     /// let mut byte_array = *b"Hello, World!";
     /// let mut slice: &mut [u8] = &mut byte_array[..];
-    /// let mut volatile = VolatilePtr::from_mut_ref(slice);
+    /// let mut volatile = unsafe { VolatilePtr::new(NonNull::from(slice)) };
     /// volatile.copy_within(1..5, 8);
     ///
     /// assert_eq!(&byte_array, b"Hello, Wello!");
@@ -421,9 +421,9 @@ impl<A> VolatilePtr<'_, [u8], A> {
     /// use core::ptr::NonNull;
     ///
     /// let mut vec = vec![0; 10];
-    /// let mut buf = VolatilePtr::from_mut_ref(vec.as_mut_slice());
+    /// let mut buf = unsafe { VolatilePtr::new(NonNull::from(vec.as_mut_slice())) };
     /// buf.fill(1);
-    /// assert_eq!(unsafe { buf.as_ptr().as_mut() }, &mut vec![1; 10]);
+    /// assert_eq!(unsafe { buf.as_raw_ptr().as_mut() }, &mut vec![1; 10]);
     /// ```
     pub fn fill(self, value: u8)
     where
