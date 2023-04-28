@@ -33,7 +33,7 @@ mod very_unstable;
 ///
 /// The size of this struct is the same as the size of the contained reference.
 #[repr(transparent)]
-pub struct VolatilePtrCopy<'a, T, A = ReadWrite>
+pub struct VolatilePtr<'a, T, A = ReadWrite>
 where
     T: ?Sized,
 {
@@ -42,9 +42,9 @@ where
     access: PhantomData<A>,
 }
 
-impl<'a, T, A> Copy for VolatilePtrCopy<'a, T, A> where T: ?Sized {}
+impl<'a, T, A> Copy for VolatilePtr<'a, T, A> where T: ?Sized {}
 
-impl<T, A> Clone for VolatilePtrCopy<'_, T, A>
+impl<T, A> Clone for VolatilePtr<'_, T, A>
 where
     T: ?Sized,
 {
@@ -58,29 +58,26 @@ where
 /// These functions construct new `VolatilePtr` values. While the `new`
 /// function creates a `VolatilePtr` instance with unrestricted access, there
 /// are also functions for creating read-only or write-only instances.
-impl<'a, T> VolatilePtrCopy<'a, T>
+impl<'a, T> VolatilePtr<'a, T>
 where
     T: ?Sized,
 {
     pub unsafe fn new(pointer: NonNull<T>) -> Self {
-        unsafe { VolatilePtrCopy::new_restricted(ReadWrite, pointer) }
+        unsafe { VolatilePtr::new_restricted(ReadWrite, pointer) }
     }
 
     pub fn from_mut_ref(reference: &'a mut T) -> Self
     where
         T: 'a,
     {
-        unsafe { VolatilePtrCopy::new(reference.into()) }
+        unsafe { VolatilePtr::new(reference.into()) }
     }
 
-    pub const unsafe fn new_read_only(pointer: NonNull<T>) -> VolatilePtrCopy<'a, T, ReadOnly> {
+    pub const unsafe fn new_read_only(pointer: NonNull<T>) -> VolatilePtr<'a, T, ReadOnly> {
         unsafe { Self::new_restricted(ReadOnly, pointer) }
     }
 
-    pub const unsafe fn new_restricted<A>(
-        access: A,
-        pointer: NonNull<T>,
-    ) -> VolatilePtrCopy<'a, T, A>
+    pub const unsafe fn new_restricted<A>(access: A, pointer: NonNull<T>) -> VolatilePtr<'a, T, A>
     where
         A: Access,
     {
@@ -88,15 +85,15 @@ where
         unsafe { Self::new_generic(pointer) }
     }
 
-    pub fn from_ref(reference: &'a T) -> VolatilePtrCopy<'a, T, ReadOnly>
+    pub fn from_ref(reference: &'a T) -> VolatilePtr<'a, T, ReadOnly>
     where
         T: 'a,
     {
-        unsafe { VolatilePtrCopy::new_restricted(ReadOnly, reference.into()) }
+        unsafe { VolatilePtr::new_restricted(ReadOnly, reference.into()) }
     }
 
-    const unsafe fn new_generic<A>(pointer: NonNull<T>) -> VolatilePtrCopy<'a, T, A> {
-        VolatilePtrCopy {
+    const unsafe fn new_generic<A>(pointer: NonNull<T>) -> VolatilePtr<'a, T, A> {
+        VolatilePtr {
             pointer,
             reference: PhantomData,
             access: PhantomData,
@@ -104,7 +101,7 @@ where
     }
 }
 
-impl<'a, T, A> VolatilePtrCopy<'a, T, A>
+impl<'a, T, A> VolatilePtr<'a, T, A>
 where
     T: ?Sized,
 {
@@ -261,27 +258,27 @@ where
     ///    value
     /// })};
     /// ```
-    pub unsafe fn map<F, U>(self, f: F) -> VolatilePtrCopy<'a, U, A::RestrictShared>
+    pub unsafe fn map<F, U>(self, f: F) -> VolatilePtr<'a, U, A::RestrictShared>
     where
         F: FnOnce(NonNull<T>) -> NonNull<U>,
         A: Access,
         U: ?Sized,
     {
-        unsafe { VolatilePtrCopy::new_restricted(Default::default(), f(self.pointer)) }
+        unsafe { VolatilePtr::new_restricted(Default::default(), f(self.pointer)) }
     }
 
-    pub unsafe fn map_mut<F, U>(self, f: F) -> VolatilePtrCopy<'a, U, A>
+    pub unsafe fn map_mut<F, U>(self, f: F) -> VolatilePtr<'a, U, A>
     where
         F: FnOnce(NonNull<T>) -> NonNull<U>,
         U: ?Sized,
         A: Access,
     {
-        unsafe { VolatilePtrCopy::new_restricted(A::default(), f(self.pointer)) }
+        unsafe { VolatilePtr::new_restricted(A::default(), f(self.pointer)) }
     }
 }
 
 /// Methods for restricting access.
-impl<'a, T> VolatilePtrCopy<'a, T, ReadWrite>
+impl<'a, T> VolatilePtr<'a, T, ReadWrite>
 where
     T: ?Sized,
 {
@@ -300,8 +297,8 @@ where
     /// assert_eq!(read_only.read(), -4);
     /// // read_only.write(10); // compile-time error
     /// ```
-    pub fn read_only(self) -> VolatilePtrCopy<'a, T, ReadOnly> {
-        unsafe { VolatilePtrCopy::new_restricted(ReadOnly, self.pointer) }
+    pub fn read_only(self) -> VolatilePtr<'a, T, ReadOnly> {
+        unsafe { VolatilePtr::new_restricted(ReadOnly, self.pointer) }
     }
 
     /// Restricts access permissions to write-only.
@@ -323,12 +320,12 @@ where
     /// field_2.write(14);
     /// // field_2.read(); // compile-time error
     /// ```
-    pub fn write_only(self) -> VolatilePtrCopy<'a, T, WriteOnly> {
-        unsafe { VolatilePtrCopy::new_restricted(WriteOnly, self.pointer) }
+    pub fn write_only(self) -> VolatilePtr<'a, T, WriteOnly> {
+        unsafe { VolatilePtr::new_restricted(WriteOnly, self.pointer) }
     }
 }
 
-impl<T, A> fmt::Debug for VolatilePtrCopy<'_, T, A>
+impl<T, A> fmt::Debug for VolatilePtr<'_, T, A>
 where
     T: Copy + fmt::Debug + ?Sized,
     A: Readable,

@@ -13,10 +13,10 @@
 #![warn(missing_docs)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
-pub use ptr_copy::VolatilePtrCopy;
+pub use volatile_ptr::VolatilePtr;
 pub use volatile_ref::VolatileRef;
 
 pub mod access;
 mod macros;
-mod ptr_copy;
+mod volatile_ptr;
 mod volatile_ref;

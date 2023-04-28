@@ -7,7 +7,7 @@
 
 use crate::{
     access::{Access, ReadOnly, ReadWrite, Readable, Writable, WriteOnly},
-    ptr_copy,
+    volatile_ptr,
 };
 use core::{fmt, marker::PhantomData, ptr::NonNull};
 
@@ -276,18 +276,18 @@ where
         unsafe { VolatileRef::new_restricted(A::default(), f(self.pointer)) }
     }
 
-    pub fn as_ref<'b>(&'b self) -> ptr_copy::VolatilePtrCopy<'b, T, A::RestrictShared>
+    pub fn as_ref<'b>(&'b self) -> volatile_ptr::VolatilePtr<'b, T, A::RestrictShared>
     where
         A: Access,
     {
-        unsafe { ptr_copy::VolatilePtrCopy::new_restricted(Default::default(), self.pointer) }
+        unsafe { volatile_ptr::VolatilePtr::new_restricted(Default::default(), self.pointer) }
     }
 
-    pub fn as_mut<'b>(&'b mut self) -> ptr_copy::VolatilePtrCopy<'b, T, A>
+    pub fn as_mut<'b>(&'b mut self) -> volatile_ptr::VolatilePtr<'b, T, A>
     where
         A: Access,
     {
-        unsafe { ptr_copy::VolatilePtrCopy::new_restricted(Default::default(), self.pointer) }
+        unsafe { volatile_ptr::VolatilePtr::new_restricted(Default::default(), self.pointer) }
     }
 }
 
