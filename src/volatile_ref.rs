@@ -1,21 +1,20 @@
-//! Provides the wrapper type `Volatile`, which wraps a reference to any copy-able type and allows
-//! for volatile memory access to wrapped value. Volatile memory accesses are never optimized away
-//! by the compiler, and are useful in many low-level systems programming and concurrent contexts.
-//!
-//! The wrapper types *do not* enforce any atomicity guarantees; to also get atomicity, consider
-//! looking at the `Atomic` wrapper types found in `libcore` or `libstd`.
-
 use crate::{
     access::{Access, Copyable, ReadOnly, ReadWrite, Readable, WriteOnly},
     volatile_ptr,
 };
 use core::{fmt, marker::PhantomData, ptr::NonNull};
 
-/// Wraps a pointer to make accesses to the referenced value volatile.
+/// Volatile pointer type that respects Rust's aliasing rules.
 ///
-/// Allows volatile reads and writes on the referenced value. The referenced value needs to
-/// be `Copy` for reading and writing, as volatile reads and writes take and return copies
-/// of the value.
+/// This pointer type behaves similar to Rust's reference types:
+///
+/// - it requires exclusive `&mut self` access for mutability
+/// - only read-only types implement [`Clone`] and [`Copy`]
+/// - [`Send`] and [`Sync`] are implemented if `T: Sync`
+///
+/// To perform volatile operations on `VolatileRef` types, use the [`as_ptr`][Self::as_ptr]
+/// or [`as_mut_ptr`](Self::as_mut_ptr) methods to create a temporary
+/// [`VolatilePtr`][crate::VolatilePtr] instance.
 ///
 /// Since not all volatile resources (e.g. memory mapped device registers) are both readable
 /// and writable, this type supports limiting the allowed access types through an optional second

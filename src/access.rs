@@ -1,3 +1,6 @@
+//! Marker types for limiting access.
+
+/// Private trait that is implemented for the types in this module.
 pub trait Access: Copy + Default {
     /// Ensures that this trait cannot be implemented outside of this crate.
     #[doc(hidden)]
@@ -5,11 +8,13 @@ pub trait Access: Copy + Default {
         _Private
     }
 
+    /// Reduced access level to safely share the corresponding value.
     type RestrictShared: Access;
 }
 
 /// Helper trait that is implemented by [`ReadWrite`] and [`ReadOnly`].
 pub trait Readable: Copy + Default {
+    /// Reduced access level to safely share the corresponding value.
     type RestrictShared: Readable + Access;
 
     /// Ensures that this trait cannot be implemented outside of this crate.

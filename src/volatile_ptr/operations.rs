@@ -17,14 +17,31 @@ impl<'a, T> VolatilePtr<'a, T>
 where
     T: ?Sized,
 {
+    /// Turns the given pointer into a `VolatilePtr`.
+    ///
+    /// ## Safety
+    ///
+    /// - The given pointer must be valid.
+    /// - No other thread must have access to the given pointer. This must remain true
+    ///   for the whole lifetime of the `VolatilePtr`.
     pub unsafe fn new(pointer: NonNull<T>) -> VolatilePtr<'a, T, ReadWrite> {
         unsafe { VolatilePtr::new_restricted(ReadWrite, pointer) }
     }
 
+    /// Creates a new read-only volatile pointer from the given raw pointer.
+    ///
+    /// ## Safety
+    ///
+    /// The requirements for [`Self::new`] apply to this function too.
     pub const unsafe fn new_read_only(pointer: NonNull<T>) -> VolatilePtr<'a, T, ReadOnly> {
         unsafe { Self::new_restricted(ReadOnly, pointer) }
     }
 
+    /// Creates a new volatile pointer with restricted access from the given raw pointer.
+    ///
+    /// ## Safety
+    ///
+    /// The requirements for [`Self::new`] apply to this function too.
     pub const unsafe fn new_restricted<A>(access: A, pointer: NonNull<T>) -> VolatilePtr<'a, T, A>
     where
         A: Access,
@@ -70,7 +87,6 @@ where
         T: Copy,
         A: Readable,
     {
-        // UNSAFE: Safe, as ... TODO
         unsafe { ptr::read_volatile(self.pointer.as_ptr()) }
     }
 
@@ -97,7 +113,6 @@ where
         T: Copy,
         A: Writable,
     {
-        // UNSAFE: Safe, as ... TODO
         unsafe { ptr::write_volatile(self.pointer.as_ptr(), value) };
     }
 
@@ -149,8 +164,8 @@ where
     /// Constructs a new `VolatilePtr` by mapping the wrapped pointer.
     ///
     /// This method is useful for accessing only a part of a volatile value, e.g. a subslice or
-    /// a struct field. For struct field access, there is also the safe [`map_field`] macro that
-    /// wraps this function.
+    /// a struct field. For struct field access, there is also the safe
+    /// [`map_field`][crate::map_field] macro that wraps this function.
     ///
     /// ## Examples
     ///

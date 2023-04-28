@@ -1,10 +1,3 @@
-//! Provides the wrapper type `Volatile`, which wraps a reference to any copy-able type and allows
-//! for volatile memory access to wrapped value. Volatile memory accesses are never optimized away
-//! by the compiler, and are useful in many low-level systems programming and concurrent contexts.
-//!
-//! The wrapper types *do not* enforce any atomicity guarantees; to also get atomicity, consider
-//! looking at the `Atomic` wrapper types found in `libcore` or `libstd`.
-
 use core::{fmt, marker::PhantomData, ptr::NonNull};
 
 use crate::access::{ReadWrite, Readable};
