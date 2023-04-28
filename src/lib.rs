@@ -14,9 +14,9 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 pub use ptr_copy::VolatilePtrCopy;
-pub use ptr_send::VolatilePtr;
+pub use volatile_ref::VolatileRef;
 
 pub mod access;
 mod macros;
 mod ptr_copy;
-mod ptr_send;
+mod volatile_ref;
