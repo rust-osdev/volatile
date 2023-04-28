@@ -6,7 +6,7 @@
 //! looking at the `Atomic` wrapper types found in `libcore` or `libstd`.
 
 use crate::{
-    access::{Access, ReadOnly, ReadWrite, Readable, WriteOnly},
+    access::{Access, Copyable, ReadOnly, ReadWrite, Readable, WriteOnly},
     volatile_ptr,
 };
 use core::{fmt, marker::PhantomData, ptr::NonNull};
@@ -145,6 +145,27 @@ where
     pub fn write_only(self) -> VolatileRef<'a, T, WriteOnly> {
         unsafe { VolatileRef::new_restricted(WriteOnly, self.pointer) }
     }
+}
+
+impl<'a, T, A> Clone for VolatileRef<'a, T, A>
+where
+    T: ?Sized,
+    A: Access + Copyable,
+{
+    fn clone(&self) -> Self {
+        Self {
+            pointer: self.pointer,
+            reference: self.reference,
+            access: self.access,
+        }
+    }
+}
+
+impl<'a, T, A> Copy for VolatileRef<'a, T, A>
+where
+    T: ?Sized,
+    A: Access + Copyable,
+{
 }
 
 unsafe impl<T, A> Send for VolatileRef<'_, T, A> where T: Sync {}
