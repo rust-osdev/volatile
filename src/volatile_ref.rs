@@ -1,6 +1,6 @@
 use crate::{
-    access::{Access, Copyable, ReadOnly, ReadWrite, Readable, WriteOnly},
-    volatile_ptr,
+    access::{Access, Copyable, ReadOnly, ReadWrite, WriteOnly},
+    volatile_ptr::VolatilePtr,
 };
 use core::{fmt, marker::PhantomData, ptr::NonNull};
 
@@ -173,11 +173,11 @@ unsafe impl<T, A> Sync for VolatileRef<'_, T, A> where T: Sync {}
 impl<T, A> fmt::Debug for VolatileRef<'_, T, A>
 where
     T: Copy + fmt::Debug + ?Sized,
-    A: Readable,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Volatile")
-            .field(&self.as_ptr().read())
+        f.debug_struct("VolatileRef")
+            .field("pointer", &self.pointer)
+            .field("access", &self.access)
             .finish()
     }
 }

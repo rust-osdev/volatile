@@ -1,6 +1,6 @@
 use core::{fmt, marker::PhantomData, ptr::NonNull};
 
-use crate::access::{ReadWrite, Readable};
+use crate::access::ReadWrite;
 
 mod macros;
 mod operations;
@@ -48,9 +48,11 @@ where
 impl<T, A> fmt::Debug for VolatilePtr<'_, T, A>
 where
     T: Copy + fmt::Debug + ?Sized,
-    A: Readable,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Volatile").field(&self.read()).finish()
+        f.debug_struct("VolatilePtr")
+            .field("pointer", &self.pointer)
+            .field("access", &self.access)
+            .finish()
     }
 }
