@@ -131,18 +131,38 @@ impl<'a, T, A> VolatileRef<'a, T, A>
 where
     T: ?Sized,
 {
-    pub fn as_ptr(&self) -> volatile_ptr::VolatilePtr<'_, T, A::RestrictShared>
+    /// Borrows this `VolatileRef` as a read-only [`VolatilePtr`].
+    ///
+    /// Use this method to do (partial) volatile reads of the referenced data.
+    pub fn as_ptr(&self) -> VolatilePtr<'_, T, A::RestrictShared>
     where
         A: Access,
     {
-        unsafe { volatile_ptr::VolatilePtr::new_restricted(Default::default(), self.pointer) }
+        unsafe { VolatilePtr::new_restricted(Default::default(), self.pointer) }
     }
 
-    pub fn as_mut_ptr(&mut self) -> volatile_ptr::VolatilePtr<'_, T, A>
+    /// Borrows this `VolatileRef` as a mutable [`VolatilePtr`].
+    ///
+    /// Use this method to do (partial) volatile reads or writes of the referenced data.
+    pub fn as_mut_ptr(&mut self) -> VolatilePtr<'_, T, A>
     where
         A: Access,
     {
-        unsafe { volatile_ptr::VolatilePtr::new_restricted(Default::default(), self.pointer) }
+        unsafe { VolatilePtr::new_restricted(Default::default(), self.pointer) }
+    }
+
+    /// Converts this `VolatileRef` into a [`VolatilePtr`] with full access without shortening
+    /// the lifetime.
+    ///
+    /// Use this method when you need a [`VolatilePtr`] instance that lives for the full
+    /// lifetime `'a`.
+    ///
+    /// This method consumes the `VolatileRef`.
+    pub fn into_ptr(self) -> VolatilePtr<'a, T, A>
+    where
+        A: Access,
+    {
+        unsafe { VolatilePtr::new_restricted(Default::default(), self.pointer) }
     }
 }
 
