@@ -41,21 +41,47 @@ impl<'a, T> VolatileRef<'a, T>
 where
     T: ?Sized,
 {
+    /// Turns the given pointer into a `VolatileRef`.
+    ///
+    /// ## Safety
+    ///
+    /// - The pointer must be properly aligned.
+    /// - It must be “dereferenceable” in the sense defined in the [`core::ptr`] documentation.
+    /// - The pointer must point to an initialized instance of T.
+    /// - You must enforce Rust’s aliasing rules, since the returned lifetime 'a is arbitrarily
+    ///   chosen and does not necessarily reflect the actual lifetime of the data. In particular,
+    ///   while this `VolatileRef` exists, the memory the pointer points to must not get accessed
+    ///   (_read or written_) through any other pointer.
     pub unsafe fn new(pointer: NonNull<T>) -> Self {
         unsafe { VolatileRef::new_restricted(ReadWrite, pointer) }
     }
 
-    pub fn from_mut_ref(reference: &'a mut T) -> Self
-    where
-        T: 'a,
-    {
-        unsafe { VolatileRef::new(reference.into()) }
-    }
-
+    /// Turns the given pointer into a read-only `VolatileRef`.
+    ///
+    /// ## Safety
+    ///
+    /// - The pointer must be properly aligned.
+    /// - It must be “dereferenceable” in the sense defined in the [`core::ptr`] documentation.
+    /// - The pointer must point to an initialized instance of T.
+    /// - You must enforce Rust’s aliasing rules, since the returned lifetime 'a is arbitrarily
+    ///   chosen and does not necessarily reflect the actual lifetime of the data. In particular,
+    ///   while this `VolatileRef` exists, the memory the pointer points to _must not get mutated_.
     pub const unsafe fn new_read_only(pointer: NonNull<T>) -> VolatileRef<'a, T, ReadOnly> {
         unsafe { Self::new_restricted(ReadOnly, pointer) }
     }
 
+    /// Turns the given pointer into a `VolatileRef` instance with the given access.
+    ///
+    /// ## Safety
+    ///
+    /// - The pointer must be properly aligned.
+    /// - It must be “dereferenceable” in the sense defined in the [`core::ptr`] documentation.
+    /// - The pointer must point to an initialized instance of T.
+    /// - You must enforce Rust’s aliasing rules, since the returned lifetime 'a is arbitrarily
+    ///   chosen and does not necessarily reflect the actual lifetime of the data. In particular,
+    ///   while this `VolatileRef` exists, the memory the pointer points to _must not get mutated_.
+    ///   If the given `access` parameter allows write access, the pointer _must not get read
+    ///   either_ while this `VolatileRef` exists.
     pub const unsafe fn new_restricted<A>(access: A, pointer: NonNull<T>) -> VolatileRef<'a, T, A>
     where
         A: Access,
@@ -64,11 +90,32 @@ where
         unsafe { Self::new_generic(pointer) }
     }
 
+    /// Creates a `VolatileRef` from the given shared reference.
+    ///
+    /// **Note:** This function is only intended for testing, not for accessing real volatile
+    /// data. The reason is that the `&mut T` argument is considered _dereferenceable_ by Rust,
+    /// so the compiler is allowed to insert non-volatile reads. This might lead to undesired
+    /// (or even undefined?) behavior when accessing volatile data. So to be safe, only create
+    /// raw pointers to volatile data and use the [`Self::new`] constructor instead.
     pub fn from_ref(reference: &'a T) -> VolatileRef<'a, T, ReadOnly>
     where
         T: 'a,
     {
         unsafe { VolatileRef::new_restricted(ReadOnly, reference.into()) }
+    }
+
+    /// Creates a `VolatileRef` from the given mutable reference.
+    ///
+    /// **Note:** This function is only intended for testing, not for accessing real volatile
+    /// data. The reason is that the `&mut T` argument is considered _dereferenceable_ by Rust,
+    /// so the compiler is allowed to insert non-volatile reads. This might lead to undesired
+    /// (or even undefined?) behavior when accessing volatile data. So to be safe, only create
+    /// raw pointers to volatile data and use the [`Self::new`] constructor instead.
+    pub fn from_mut_ref(reference: &'a mut T) -> Self
+    where
+        T: 'a,
+    {
+        unsafe { VolatileRef::new(reference.into()) }
     }
 
     const unsafe fn new_generic<A>(pointer: NonNull<T>) -> VolatileRef<'a, T, A> {
