@@ -1,5 +1,12 @@
 # Unreleased
 
+- **Breaking:** [New design based on raw pointers](https://github.com/rust-osdev/volatile/pull/29)
+  - The previous reference-based design was [unsound](https://github.com/rust-osdev/volatile/pull/13#issuecomment-842455552) because it allowed the compiler to insert spurious reads.
+  - The new design features two wrapper types for raw pointers: `VolatilePtr` and `VolatileRef`
+  - `VolatilePtr` provides safe read and write access to volatile values. Like raw pointers, it implements `Copy` and is `!Sync`.
+  - `VolatileRef` is a pointer type that respects Rust's aliasing rules. It doesn't implement `Copy`, requires a `&mut` reference for modification, and implements `Sync`. It can converted to temporary `VolatilePtr` instances through the `as_ptr`/`as_mut_ptr` methods.
+- We now provide methods for volatile slice operations and a `map!` macro for struct field projection. These advanced features are gated behind a cargo feature named _"unstable"_.
+
 # 0.4.6 – 2023-01-17
 
 - Fix UB in slice methods when Deref returns different references ([#27](https://github.com/rust-osdev/volatile/pull/27))
