@@ -2,7 +2,9 @@ use core::{fmt, marker::PhantomData, ptr::NonNull};
 
 use crate::access::{ReadWrite, Readable};
 
+mod macros;
 mod operations;
+
 #[cfg(test)]
 mod tests;
 #[cfg(feature = "unstable")]

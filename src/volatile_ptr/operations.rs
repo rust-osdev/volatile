@@ -200,20 +200,15 @@ where
     ///    value
     /// })};
     /// ```
-    pub unsafe fn map<F, U>(self, f: F) -> VolatilePtr<'a, U, A::RestrictShared>
+    ///
+    /// ## Safety
+    ///
+    /// The pointer returned by `f` must satisfy the requirements of [`Self::new`].
+    pub unsafe fn map<F, U>(self, f: F) -> VolatilePtr<'a, U, A>
     where
         F: FnOnce(NonNull<T>) -> NonNull<U>,
         A: Access,
         U: ?Sized,
-    {
-        unsafe { VolatilePtr::new_restricted(Default::default(), f(self.pointer)) }
-    }
-
-    pub unsafe fn map_mut<F, U>(self, f: F) -> VolatilePtr<'a, U, A>
-    where
-        F: FnOnce(NonNull<T>) -> NonNull<U>,
-        U: ?Sized,
-        A: Access,
     {
         unsafe { VolatilePtr::new_restricted(A::default(), f(self.pointer)) }
     }
@@ -250,7 +245,7 @@ where
     /// Creating a write-only pointer to a struct field:
     ///
     /// ```
-    /// use volatile::{VolatilePtr, map_field_mut};
+    /// use volatile::{VolatilePtr, map_field};
     /// use core::ptr::NonNull;
     ///
     /// struct Example { field_1: u32, field_2: u8, }
@@ -258,7 +253,7 @@ where
     /// let mut volatile = unsafe { VolatilePtr::new((&mut value).into()) };
     ///
     /// // construct a volatile write-only pointer to `field_2`
-    /// let mut field_2 = map_field_mut!(volatile.field_2).write_only();
+    /// let mut field_2 = map_field!(volatile.field_2).write_only();
     /// field_2.write(14);
     /// // field_2.read(); // compile-time error
     /// ```

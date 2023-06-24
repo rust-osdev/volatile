@@ -50,6 +50,5 @@ pub use volatile_ptr::VolatilePtr;
 pub use volatile_ref::VolatileRef;
 
 pub mod access;
-mod macros;
 mod volatile_ptr;
 mod volatile_ref;

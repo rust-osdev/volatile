@@ -53,10 +53,7 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
     /// let subslice = volatile.index(1..);
     /// assert_eq!(subslice.index(0).read(), 2);
     /// ```
-    pub fn index<I>(
-        self,
-        index: I,
-    ) -> VolatilePtr<'a, <I as SliceIndex<[T]>>::Output, A::RestrictShared>
+    pub fn index<I>(self, index: I) -> VolatilePtr<'a, <I as SliceIndex<[T]>>::Output, A>
     where
         I: SliceIndex<[T]> + SliceIndex<[()]> + Clone,
         A: Access,
@@ -66,29 +63,11 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
         unsafe { self.map(|slice| slice.get_unchecked_mut(index)) }
     }
 
-    pub fn index_mut<I>(self, index: I) -> VolatilePtr<'a, <I as SliceIndex<[T]>>::Output, A>
-    where
-        I: SliceIndex<[T]> + SliceIndex<[()]> + Clone,
-        A: Access,
-    {
-        bounds_check(self.pointer.len(), index.clone());
-
-        unsafe { self.map_mut(|slice| slice.get_unchecked_mut(index)) }
-    }
-
     /// Returns an iterator over the slice.
-    pub fn iter(self) -> impl Iterator<Item = VolatilePtr<'a, T, A::RestrictShared>>
+    pub fn iter(self) -> impl Iterator<Item = VolatilePtr<'a, T, A>>
     where
         A: Access,
     {
-        let ptr = self.as_raw_ptr().as_ptr() as *mut T;
-        let len = self.len();
-        (0..len)
-            .map(move |i| unsafe { VolatilePtr::new_generic(NonNull::new_unchecked(ptr.add(i))) })
-    }
-
-    /// Returns an iterator that allows modifying each value.
-    pub fn iter_mut(self) -> impl Iterator<Item = VolatilePtr<'a, T, A>> {
         let ptr = self.as_raw_ptr().as_ptr() as *mut T;
         let len = self.len();
         (0..len)
@@ -260,13 +239,7 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
         }
     }
 
-    pub fn split_at(
-        self,
-        mid: usize,
-    ) -> (
-        VolatilePtr<'a, [T], A::RestrictShared>,
-        VolatilePtr<'a, [T], A::RestrictShared>,
-    )
+    pub fn split_at(self, mid: usize) -> (VolatilePtr<'a, [T], A>, VolatilePtr<'a, [T], A>)
     where
         A: Access,
     {
@@ -276,23 +249,10 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
         unsafe { self.split_at_unchecked(mid) }
     }
 
-    pub fn split_at_mut(self, mid: usize) -> (VolatilePtr<'a, [T], A>, VolatilePtr<'a, [T], A>)
-    where
-        A: Access,
-    {
-        assert!(mid <= self.pointer.len());
-        // SAFETY: `[ptr; mid]` and `[mid; len]` are inside `self`, which
-        // fulfills the requirements of `from_raw_parts_mut`.
-        unsafe { self.split_at_mut_unchecked(mid) }
-    }
-
     unsafe fn split_at_unchecked(
         self,
         mid: usize,
-    ) -> (
-        VolatilePtr<'a, [T], A::RestrictShared>,
-        VolatilePtr<'a, [T], A::RestrictShared>,
-    )
+    ) -> (VolatilePtr<'a, [T], A>, VolatilePtr<'a, [T], A>)
     where
         A: Access,
     {
@@ -305,38 +265,9 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
         }
     }
 
-    unsafe fn split_at_mut_unchecked(
-        self,
-        mid: usize,
-    ) -> (VolatilePtr<'a, [T], A>, VolatilePtr<'a, [T], A>)
-    where
-        A: Access,
-    {
-        let len = self.pointer.len();
-        let ptr = self.pointer.as_mut_ptr();
-
-        // SAFETY: Caller has to check that `0 <= mid <= self.len()`.
-        //
-        // `[ptr; mid]` and `[mid; len]` are not overlapping, so returning a mutable reference
-        // is fine.
-        unsafe {
-            (
-                VolatilePtr::new_generic(
-                    NonNull::new(ptr::slice_from_raw_parts_mut(ptr, mid)).unwrap(),
-                ),
-                VolatilePtr::new_generic(
-                    NonNull::new(ptr::slice_from_raw_parts_mut(ptr.add(mid), len - mid)).unwrap(),
-                ),
-            )
-        }
-    }
-
     pub fn as_chunks<const N: usize>(
         self,
-    ) -> (
-        VolatilePtr<'a, [[T; N]], <A::RestrictShared as Access>::RestrictShared>,
-        VolatilePtr<'a, [T], A::RestrictShared>,
-    )
+    ) -> (VolatilePtr<'a, [[T; N]], A>, VolatilePtr<'a, [T], A>)
     where
         A: Access,
     {
@@ -349,43 +280,10 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
         (array_slice, remainder)
     }
 
-    pub unsafe fn as_chunks_unchecked<const N: usize>(
-        self,
-    ) -> VolatilePtr<'a, [[T; N]], A::RestrictShared>
+    pub unsafe fn as_chunks_unchecked<const N: usize>(self) -> VolatilePtr<'a, [[T; N]], A>
     where
         A: Access,
     {
-        debug_assert_ne!(N, 0);
-        debug_assert_eq!(self.pointer.len() % N, 0);
-        let new_len =
-            // SAFETY: Our precondition is exactly what's needed to call this
-            unsafe { core::intrinsics::exact_div(self.pointer.len(), N) };
-        // SAFETY: We cast a slice of `new_len * N` elements into
-        // a slice of `new_len` many `N` elements chunks.
-        let pointer = NonNull::new(ptr::slice_from_raw_parts_mut(
-            self.pointer.as_mut_ptr().cast(),
-            new_len,
-        ))
-        .unwrap();
-        unsafe { VolatilePtr::new_generic(pointer) }
-    }
-
-    pub fn as_chunks_mut<const N: usize>(
-        self,
-    ) -> (VolatilePtr<'a, [[T; N]], A>, VolatilePtr<'a, [T], A>)
-    where
-        A: Access,
-    {
-        assert_ne!(N, 0);
-        let len = self.pointer.len() / N;
-        let (multiple_of_n, remainder) = self.split_at_mut(len * N);
-        // SAFETY: We already panicked for zero, and ensured by construction
-        // that the length of the subslice is a multiple of N.
-        let array_slice = unsafe { multiple_of_n.as_chunks_unchecked_mut() };
-        (array_slice, remainder)
-    }
-
-    pub unsafe fn as_chunks_unchecked_mut<const N: usize>(self) -> VolatilePtr<'a, [[T; N]], A> {
         debug_assert_ne!(N, 0);
         debug_assert_eq!(self.pointer.len() % N, 0);
         let new_len =
@@ -440,7 +338,7 @@ impl<A> VolatilePtr<'_, [u8], A> {
 /// These methods are only available with the `unstable` feature enabled (requires a nightly
 /// Rust compiler).
 impl<'a, T, A, const N: usize> VolatilePtr<'a, [T; N], A> {
-    /// Converts an array reference to a shared slice.
+    /// Converts an array pointer to a slice pointer.
     ///
     /// This makes it possible to use the methods defined on slices.
     ///
@@ -463,46 +361,12 @@ impl<'a, T, A, const N: usize> VolatilePtr<'a, [T; N], A> {
     ///
     /// assert_eq!(dst, [1, 2]);
     /// ```
-    pub fn as_slice(self) -> VolatilePtr<'a, [T], A::RestrictShared>
+    pub fn as_slice(self) -> VolatilePtr<'a, [T], A>
     where
         A: Access,
     {
         unsafe {
             self.map(|array| {
-                NonNull::new(ptr::slice_from_raw_parts_mut(array.as_ptr() as *mut T, N)).unwrap()
-            })
-        }
-    }
-
-    /// Converts an array reference to a shared slice.
-    ///
-    /// This makes it possible to use the methods defined on slices.
-    ///
-    /// ## Example
-    ///
-    /// Copying two elements into a volatile array reference using `copy_from_slice`:
-    ///
-    /// ```
-    /// use volatile::{access, VolatilePtr};
-    /// use core::ptr::NonNull;
-    ///
-    /// let src = [1, 2];
-    /// let mut dst = [0, 0];
-    /// let mut volatile = unsafe { VolatilePtr::new_restricted(access::WriteOnly, NonNull::from(&dst)) };
-    ///
-    /// // convert the `Volatile<[i32; 2]>` array reference to a `Volatile<[i32]>` slice
-    /// let mut volatile_slice = volatile.as_slice_mut();
-    /// // we can now use the slice methods
-    /// volatile_slice.copy_from_slice(&src);
-    ///
-    /// assert_eq!(dst, [1, 2]);
-    /// ```
-    pub fn as_slice_mut(self) -> VolatilePtr<'a, [T], A>
-    where
-        A: Access,
-    {
-        unsafe {
-            self.map_mut(|array| {
                 NonNull::new(ptr::slice_from_raw_parts_mut(array.as_ptr() as *mut T, N)).unwrap()
             })
         }

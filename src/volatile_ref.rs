@@ -34,8 +34,8 @@ where
 
 /// Constructor functions.
 ///
-/// These functions construct new `Volatile` values. While the `new`
-/// function creates a `Volatile` instance with unrestricted access, there
+/// These functions construct new `VolatileRef` values. While the `new`
+/// function creates a `VolatileRef` instance with unrestricted access, there
 /// are also functions for creating read-only or write-only instances.
 impl<'a, T> VolatileRef<'a, T>
 where
@@ -130,7 +130,7 @@ where
     /// Creating a write-only reference to a struct field:
     ///
     /// ```
-    /// use volatile::{VolatileRef, map_field_mut};
+    /// use volatile::{VolatileRef};
     /// use core::ptr::NonNull;
     ///
     /// #[derive(Clone, Copy)]

@@ -37,30 +37,11 @@ macro_rules! map_field {
         // sure that the field is not potentially unaligned. The body of the
         // if statement will never be executed, so it can never cause any UB.
         if false {
-            #[deny(unaligned_references)]
             let _ref_to_field = &(unsafe { &*$volatile.as_raw_ptr().as_ptr() }).$place;
         }
 
         unsafe {
             $volatile.map(|ptr| {
-                core::ptr::NonNull::new(core::ptr::addr_of_mut!((*ptr.as_ptr()).$place)).unwrap()
-            })
-        }
-    }};
-}
-
-#[macro_export]
-macro_rules! map_field_mut {
-    ($volatile:ident.$place:ident) => {{
-        // Simulate creating a reference to the field. This is done to make
-        // sure that the field is not potentially unaligned. The body of the
-        // if statement will never be executed, so it can never cause any UB.
-        if false {
-            let _ref_to_field = &(unsafe { &*$volatile.as_raw_ptr().as_ptr() }).$place;
-        }
-
-        unsafe {
-            $volatile.map_mut(|ptr| {
                 core::ptr::NonNull::new(core::ptr::addr_of_mut!((*ptr.as_ptr()).$place)).unwrap()
             })
         }
