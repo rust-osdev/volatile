@@ -1,5 +1,7 @@
 # Unreleased
 
+- Fix: Add missing documentation of the `map` macro
+
 # 0.5.0 – 2023-06-24
 
 - **Breaking:** [New design based on raw pointers](https://github.com/rust-osdev/volatile/pull/29)

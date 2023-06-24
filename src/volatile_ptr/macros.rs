@@ -1,4 +1,4 @@
-/// TODO
+/// Provides safe field projection for volatile pointers referencing structs.
 ///
 /// ## Examples
 ///
