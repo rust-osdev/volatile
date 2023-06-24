@@ -1,6 +1,6 @@
 [package]
 name = "volatile"
-version = "0.4.6"
+version = "0.5.0"
 authors = ["Philipp Oppermann <dev@phil-opp.com>"]
 license = "MIT OR Apache-2.0"
 keywords = ["volatile"]

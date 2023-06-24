@@ -1,5 +1,7 @@
 # Unreleased
 
+# 0.5.0 – 2023-06-24
+
 - **Breaking:** [New design based on raw pointers](https://github.com/rust-osdev/volatile/pull/29)
   - The previous reference-based design was [unsound](https://github.com/rust-osdev/volatile/pull/13#issuecomment-842455552) because it allowed the compiler to insert spurious reads.
   - The new design features two wrapper types for raw pointers: `VolatilePtr` and `VolatileRef`
