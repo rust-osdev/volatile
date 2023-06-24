@@ -70,6 +70,26 @@ jobs:
           command: test
           args: --features unstable
 
+  very_unstable:
+    name: Test Suite (very_unstable)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+
+      - name: Run cargo test --features very_unstable
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --features very_unstable
+
 
   lints:
     name: Lints
