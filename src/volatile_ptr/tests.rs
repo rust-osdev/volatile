@@ -137,6 +137,7 @@ fn test_bounds_check_1() {
 fn test_bounds_check_2() {
     let val: &mut [u32] = &mut [1, 2, 3];
     let volatile = unsafe { VolatilePtr::new(NonNull::from(val)) };
+    #[allow(clippy::reversed_empty_ranges)]
     volatile.index(2..1);
 }
 

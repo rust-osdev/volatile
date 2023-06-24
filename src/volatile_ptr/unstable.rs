@@ -284,6 +284,7 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
     /// # Panics
     ///
     /// Panics if `N` is 0.
+    #[allow(clippy::type_complexity)]
     pub fn as_chunks<const N: usize>(
         self,
     ) -> (VolatilePtr<'a, [[T; N]], A>, VolatilePtr<'a, [T], A>)
