@@ -14,6 +14,22 @@
 //!
 //! Both wrapper types *do not* enforce any atomicity guarantees; to also get atomicity, consider
 //! looking at the `Atomic` wrapper types found in `libcore` or `libstd`.
+//!
+//! ## Why is there no `VolatileCell`?
+//!
+//! Many people expressed interest in a `VolatileCell` type, i.e. a transparent wrapper type that
+//! owns the wrapped value. Such a type would be similar to [`core::cell::Cell`], with the
+//! difference that all methods are volatile.
+//!
+//! Unfortunately, it is not sound to implement such a `VolatileCell` type in Rust. The reason
+//! is that Rust and LLVM consider `&` and `&mut` references as _dereferencable_. This means that
+//! the compiler is allowed to freely access the referenced value without any restrictions. So
+//! no matter how a `VolatileCell` type is implemented, the compiler is allowed to perform
+//! non-volatile read operations of the contained value, which can lead to unexpected (or even
+//! undefined?) behavior. For more details, see the discussion
+//! [in our repository](https://github.com/rust-osdev/volatile/issues/31)
+//! and
+//! [in the `unsafe-code-guidelines` repository](https://github.com/rust-lang/unsafe-code-guidelines/issues/411).
 
 #![no_std]
 #![cfg_attr(feature = "unstable", feature(core_intrinsics))]
