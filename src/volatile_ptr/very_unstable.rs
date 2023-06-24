@@ -6,6 +6,14 @@ impl<'a, T, A> VolatilePtr<'a, T, A>
 where
     T: ?Sized,
 {
+    /// Compile-time evaluable variant of [`Self::map`].
+    ///
+    /// This function is a copy of [`Self::map`] that uses unstable compiler functions
+    /// to be callable from `const` contexts.
+    ///
+    /// ## Safety
+    ///
+    /// The safety requirements of [`Self::map`] apply to this method too.
     pub const unsafe fn map_const<F, U>(self, f: F) -> VolatilePtr<'a, U, A>
     where
         F: ~const FnOnce(NonNull<T>) -> NonNull<U>,
@@ -18,6 +26,10 @@ where
 /// Methods for volatile slices
 #[cfg(feature = "unstable")]
 impl<'a, T, A> VolatilePtr<'a, [T], A> {
+    /// Compile-time evaluable variant of [`Self::index`].
+    ///
+    /// This function is a copy of [`Self::index`] that uses unstable compiler functions
+    /// to be callable from `const` contexts.
     pub const fn index_const(self, index: usize) -> VolatilePtr<'a, T, A> {
         assert!(index < self.pointer.len(), "index out of bounds");
 

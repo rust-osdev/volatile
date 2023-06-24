@@ -11,10 +11,12 @@ use crate::{
 };
 
 impl<'a, T, A> VolatilePtr<'a, [T], A> {
+    /// Returns the length of the slice.
     pub fn len(self) -> usize {
         self.pointer.len()
     }
 
+    /// Returns whether the slice is empty.
     pub fn is_empty(self) -> bool {
         self.pointer.len() == 0
     }
@@ -239,6 +241,16 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
         }
     }
 
+    /// Divides one slice into two at an index.
+    ///
+    /// The first will contain all indices from `[0, mid)` (excluding
+    /// the index `mid` itself) and the second will contain all
+    /// indices from `[mid, len)` (excluding the index `len` itself).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `mid > len`.
+    ///
     pub fn split_at(self, mid: usize) -> (VolatilePtr<'a, [T], A>, VolatilePtr<'a, [T], A>)
     where
         A: Access,
@@ -265,6 +277,13 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
         }
     }
 
+    /// Splits the slice into a slice of `N`-element arrays,
+    /// starting at the beginning of the slice,
+    /// and a remainder slice with length strictly less than `N`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `N` is 0.
     pub fn as_chunks<const N: usize>(
         self,
     ) -> (VolatilePtr<'a, [[T; N]], A>, VolatilePtr<'a, [T], A>)
@@ -280,6 +299,14 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
         (array_slice, remainder)
     }
 
+    /// Splits the slice into a slice of `N`-element arrays,
+    /// assuming that there's no remainder.
+    ///
+    /// # Safety
+    ///
+    /// This may only be called when
+    /// - The slice splits exactly into `N`-element chunks (aka `self.len() % N == 0`).
+    /// - `N != 0`.
     pub unsafe fn as_chunks_unchecked<const N: usize>(self) -> VolatilePtr<'a, [[T; N]], A>
     where
         A: Access,
