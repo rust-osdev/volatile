@@ -50,10 +50,7 @@ where
     T: ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("VolatilePtr")
-            .field("pointer", &self.pointer)
-            .field("access", &self.access)
-            .finish()
+        fmt::Pointer::fmt(&self.pointer.as_ptr(), f)
     }
 }
 
