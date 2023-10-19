@@ -234,8 +234,8 @@ where
 {
 }
 
-unsafe impl<T, A> Send for VolatileRef<'_, T, A> where T: Sync {}
-unsafe impl<T, A> Sync for VolatileRef<'_, T, A> where T: Sync {}
+unsafe impl<T, A> Send for VolatileRef<'_, T, A> where T: Sync + ?Sized {}
+unsafe impl<T, A> Sync for VolatileRef<'_, T, A> where T: Sync + ?Sized {}
 
 impl<T, A> fmt::Debug for VolatileRef<'_, T, A>
 where
