@@ -1,5 +1,8 @@
 # Unreleased
 
+- Add implementations for `fmt::Pointer`, `PartialEq`, `Eq`, `PartialOrd`, `Ord` and `Hash`.
+- Update `very_unstable` feature to latest nightly
+
 # 0.5.1 – 2023-06-24
 
 - Fix: Add missing documentation of the `map` macro

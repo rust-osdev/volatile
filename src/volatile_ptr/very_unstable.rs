@@ -16,7 +16,7 @@ where
     /// The safety requirements of [`Self::map`] apply to this method too.
     pub const unsafe fn map_const<F, U>(self, f: F) -> VolatilePtr<'a, U, A>
     where
-        F: ~const FnOnce(NonNull<T>) -> NonNull<U>,
+        F: FnOnce(NonNull<T>) -> NonNull<U>,
         U: ?Sized,
     {
         unsafe { VolatilePtr::new_generic(f(self.pointer)) }
@@ -36,7 +36,7 @@ impl<'a, T, A> VolatilePtr<'a, [T], A> {
         struct Mapper {
             index: usize,
         }
-        impl<T> const FnOnce<(NonNull<[T]>,)> for Mapper {
+        impl<T> FnOnce<(NonNull<[T]>,)> for Mapper {
             type Output = NonNull<T>;
 
             extern "rust-call" fn call_once(self, (slice,): (NonNull<[T]>,)) -> Self::Output {

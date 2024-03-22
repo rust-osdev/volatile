@@ -38,6 +38,7 @@
 #![cfg_attr(feature = "very_unstable", feature(const_trait_impl))]
 #![cfg_attr(feature = "very_unstable", feature(unboxed_closures))]
 #![cfg_attr(feature = "very_unstable", feature(fn_traits))]
+#![cfg_attr(feature = "very_unstable", feature(effects))]
 #![warn(missing_docs)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
