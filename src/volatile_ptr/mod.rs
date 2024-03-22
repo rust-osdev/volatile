@@ -1,4 +1,4 @@
-use core::{fmt, marker::PhantomData, ptr::NonNull};
+use core::{cmp::Ordering, fmt, hash, marker::PhantomData, ptr::NonNull};
 
 use crate::access::ReadWrite;
 
@@ -47,12 +47,56 @@ where
 
 impl<T, A> fmt::Debug for VolatilePtr<'_, T, A>
 where
-    T: Copy + fmt::Debug + ?Sized,
+    T: ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("VolatilePtr")
-            .field("pointer", &self.pointer)
-            .field("access", &self.access)
-            .finish()
+        fmt::Pointer::fmt(&self.pointer.as_ptr(), f)
+    }
+}
+
+impl<T, A> fmt::Pointer for VolatilePtr<'_, T, A>
+where
+    T: ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Pointer::fmt(&self.pointer.as_ptr(), f)
+    }
+}
+
+impl<T, A> PartialEq for VolatilePtr<'_, T, A>
+where
+    T: ?Sized,
+{
+    fn eq(&self, other: &Self) -> bool {
+        core::ptr::eq(self.pointer.as_ptr(), other.pointer.as_ptr())
+    }
+}
+
+impl<T, A> Eq for VolatilePtr<'_, T, A> where T: ?Sized {}
+
+impl<T, A> PartialOrd for VolatilePtr<'_, T, A>
+where
+    T: ?Sized,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(Ord::cmp(&self.pointer.as_ptr(), &other.pointer.as_ptr()))
+    }
+}
+
+impl<T, A> Ord for VolatilePtr<'_, T, A>
+where
+    T: ?Sized,
+{
+    fn cmp(&self, other: &Self) -> Ordering {
+        Ord::cmp(&self.pointer.as_ptr(), &other.pointer.as_ptr())
+    }
+}
+
+impl<T, A> hash::Hash for VolatilePtr<'_, T, A>
+where
+    T: ?Sized,
+{
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.pointer.as_ptr().hash(state);
     }
 }

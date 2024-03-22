@@ -2,7 +2,7 @@ use crate::{
     access::{Access, Copyable, ReadOnly, ReadWrite, WriteOnly},
     volatile_ptr::VolatilePtr,
 };
-use core::{fmt, marker::PhantomData, ptr::NonNull};
+use core::{cmp::Ordering, fmt, hash, marker::PhantomData, ptr::NonNull};
 
 /// Volatile pointer type that respects Rust's aliasing rules.
 ///
@@ -11,6 +11,9 @@ use core::{fmt, marker::PhantomData, ptr::NonNull};
 /// - it requires exclusive `&mut self` access for mutability
 /// - only read-only types implement [`Clone`] and [`Copy`]
 /// - [`Send`] and [`Sync`] are implemented if `T: Sync`
+///
+/// However, trait implementations like [`fmt::Debug`] and [`Eq`] behave like they do on pointer
+/// types and don't access the referenced value.
 ///
 /// To perform volatile operations on `VolatileRef` types, use the [`as_ptr`][Self::as_ptr]
 /// or [`as_mut_ptr`](Self::as_mut_ptr) methods to create a temporary
@@ -239,12 +242,56 @@ unsafe impl<T, A> Sync for VolatileRef<'_, T, A> where T: Sync {}
 
 impl<T, A> fmt::Debug for VolatileRef<'_, T, A>
 where
-    T: Copy + fmt::Debug + ?Sized,
+    T: ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("VolatileRef")
-            .field("pointer", &self.pointer)
-            .field("access", &self.access)
-            .finish()
+        fmt::Pointer::fmt(&self.pointer.as_ptr(), f)
+    }
+}
+
+impl<T, A> fmt::Pointer for VolatileRef<'_, T, A>
+where
+    T: ?Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Pointer::fmt(&self.pointer.as_ptr(), f)
+    }
+}
+
+impl<T, A> PartialEq for VolatileRef<'_, T, A>
+where
+    T: ?Sized,
+{
+    fn eq(&self, other: &Self) -> bool {
+        core::ptr::eq(self.pointer.as_ptr(), other.pointer.as_ptr())
+    }
+}
+
+impl<T, A> Eq for VolatileRef<'_, T, A> where T: ?Sized {}
+
+impl<T, A> PartialOrd for VolatileRef<'_, T, A>
+where
+    T: ?Sized,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(Ord::cmp(&self.pointer.as_ptr(), &other.pointer.as_ptr()))
+    }
+}
+
+impl<T, A> Ord for VolatileRef<'_, T, A>
+where
+    T: ?Sized,
+{
+    fn cmp(&self, other: &Self) -> Ordering {
+        Ord::cmp(&self.pointer.as_ptr(), &other.pointer.as_ptr())
+    }
+}
+
+impl<T, A> hash::Hash for VolatileRef<'_, T, A>
+where
+    T: ?Sized,
+{
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.pointer.as_ptr().hash(state);
     }
 }
