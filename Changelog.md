@@ -1,5 +1,7 @@
 # Unreleased
 
+# 0.5.2 – 2024-03-22
+
 - Add implementations for `fmt::Pointer`, `PartialEq`, `Eq`, `PartialOrd`, `Ord` and `Hash`.
 - Update `very_unstable` feature to latest nightly
 - Remove `Sized` requirement for `Send` and `Sync` impls on `VolatileRef`
