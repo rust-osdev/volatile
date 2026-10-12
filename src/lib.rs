@@ -39,7 +39,7 @@
 #![cfg_attr(feature = "very_unstable", feature(unboxed_closures))]
 #![cfg_attr(feature = "very_unstable", feature(fn_traits))]
 #![cfg_attr(feature = "very_unstable", feature(effects))]
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "unstable", allow(internal_features))]
 #![warn(missing_docs)]
 #![deny(unsafe_op_in_unsafe_fn)]
