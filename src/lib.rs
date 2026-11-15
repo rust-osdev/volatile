@@ -42,6 +42,7 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(feature = "unstable", allow(internal_features))]
 #![warn(missing_docs)]
+#![warn(clippy::missing_const_for_fn)]
 #![deny(unsafe_op_in_unsafe_fn)]
 #![doc(test(attr(deny(warnings))))]
 #![doc(test(attr(allow(dead_code))))]

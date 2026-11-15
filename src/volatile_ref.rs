@@ -56,7 +56,7 @@ where
     ///   chosen and does not necessarily reflect the actual lifetime of the data. In particular,
     ///   while this `VolatileRef` exists, the memory the pointer points to must not get accessed
     ///   (_read or written_) through any other pointer.
-    pub unsafe fn new(pointer: NonNull<T>) -> Self {
+    pub const unsafe fn new(pointer: NonNull<T>) -> Self {
         unsafe { VolatileRef::new_restricted(ReadWrite, pointer) }
     }
 
@@ -101,11 +101,11 @@ where
     /// so the compiler is allowed to insert non-volatile reads. This might lead to undesired
     /// (or even undefined?) behavior when accessing volatile data. So to be safe, only create
     /// raw pointers to volatile data and use the [`Self::new`] constructor instead.
-    pub fn from_ref(reference: &'a T) -> VolatileRef<'a, T, ReadOnly>
+    pub const fn from_ref(reference: &'a T) -> VolatileRef<'a, T, ReadOnly>
     where
         T: 'a,
     {
-        unsafe { VolatileRef::new_restricted(ReadOnly, reference.into()) }
+        unsafe { VolatileRef::new_restricted(ReadOnly, NonNull::from_ref(reference)) }
     }
 
     /// Creates a `VolatileRef` from the given mutable reference.
@@ -115,11 +115,11 @@ where
     /// so the compiler is allowed to insert non-volatile reads. This might lead to undesired
     /// (or even undefined?) behavior when accessing volatile data. So to be safe, only create
     /// raw pointers to volatile data and use the [`Self::new`] constructor instead.
-    pub fn from_mut_ref(reference: &'a mut T) -> Self
+    pub const fn from_mut_ref(reference: &'a mut T) -> Self
     where
         T: 'a,
     {
-        unsafe { VolatileRef::new(reference.into()) }
+        unsafe { VolatileRef::new(NonNull::from_ref(reference)) }
     }
 
     const unsafe fn new_generic<A>(pointer: NonNull<T>) -> VolatileRef<'a, T, A> {
