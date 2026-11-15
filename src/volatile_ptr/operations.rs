@@ -24,7 +24,7 @@ where
     /// - The given pointer must be valid.
     /// - No other thread must have access to the given pointer. This must remain true
     ///   for the whole lifetime of the `VolatilePtr`.
-    pub unsafe fn new(pointer: NonNull<T>) -> VolatilePtr<'a, T, ReadWrite> {
+    pub const unsafe fn new(pointer: NonNull<T>) -> VolatilePtr<'a, T, ReadWrite> {
         unsafe { VolatilePtr::new_restricted(ReadWrite, pointer) }
     }
 
@@ -156,7 +156,7 @@ where
     /// assert_eq!(unsafe { *unwrapped }, 50); // non volatile access, be careful!
     /// ```
     #[must_use]
-    pub fn as_raw_ptr(self) -> NonNull<T> {
+    pub const fn as_raw_ptr(self) -> NonNull<T> {
         self.pointer
     }
 
